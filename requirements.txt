@@ -1,0 +1,41 @@
+# LangChain and AI Core
+langchain>=0.1.0
+langchain-openai>=0.1.0
+langchain-community>=0.1.0
+faiss-cpu>=1.7.4
+openai>=1.0.0
+
+# Web Framework
+fastapi>=0.100.0
+uvicorn>=0.20.0
+
+# Document Loaders
+pypdf>=3.0.0
+python-docx>=0.8.11
+docx2txt>=0.8
+
+# Frontend
+streamlit>=1.28.0
+
+# Utilities
+python-dotenv>=1.0.0
+python-multipart>=0.0.6
+aiofiles>=23.0.0
+requests>=2.31.0
+
+# Voice Processing
+pyaudio>=0.2.11
+pydub>=0.25.1
+pyttsx3>=2.90
+openai-whisper>=20231117
+
+# Wake Word Detection (Optional)
+openwakeword>=0.5.0
+
+# Monitoring and Logging
+loguru>=0.7.0
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+httpx>=0.24.0
