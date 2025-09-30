@@ -1,51 +1,68 @@
+import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-sys.path.append(str(Path(__file__).parent.parent.parent / "backend"))
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
-import requesty_client  # noqa: E402  pylint: disable=wrong-import-position
+from backend import requesty_client  # type: ignore  # noqa: E402  pylint: disable=wrong-import-position
 
 
 @pytest.fixture(autouse=True)
 def restore_requesty_settings():
-    original_requesty_key = requesty_client.settings.REQUESTY_API_KEY
+    original_router_key = requesty_client.settings.ROUTER_API_KEY
     original_openai_key = requesty_client.settings.OPENAI_API_KEY
+    original_test_mode = requesty_client.settings.TEST_MODE
     yield
-    requesty_client.settings.REQUESTY_API_KEY = original_requesty_key
+    requesty_client.settings.ROUTER_API_KEY = original_router_key
     requesty_client.settings.OPENAI_API_KEY = original_openai_key
+    requesty_client.settings.TEST_MODE = original_test_mode
 
 
-def test_requesty_routes_when_api_key_available(monkeypatch):
-    monkeypatch.setattr(requesty_client.settings, "REQUESTY_API_KEY", "req-test-key", raising=False)
+def test_router_chat_completion_uses_qualified_model(monkeypatch):
+    monkeypatch.setattr(requesty_client.settings, "ROUTER_API_KEY", "router-key", raising=False)
     monkeypatch.setattr(requesty_client.settings, "OPENAI_API_KEY", "", raising=False)
+    monkeypatch.setattr(requesty_client.settings, "TEST_MODE", False, raising=False)
 
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "choices": [{"message": {"content": "Requesty response"}}]
-    }
+    fake_response = MagicMock()
+    fake_response.choices = [MagicMock(message=MagicMock(content="Router reply"))]
+    fake_response.usage = MagicMock(prompt_tokens=10, completion_tokens=20)
 
-    with patch("requesty_client.requests.post", return_value=mock_response) as mock_post:
+    fake_router_client = MagicMock()
+    fake_router_client.chat.completions.create.return_value = fake_response
+
+    with patch("backend.requesty_client.OpenAI", return_value=fake_router_client):
         client = requesty_client.RequestyClient()
-        result = client.chat_completion([{"role": "user", "content": "Hello"}])
+        reply = client.chat_completion([{"role": "user", "content": "Hello"}], model="glm-4.5")
 
-    assert result == "Requesty response"
-    mock_post.assert_called_once()
-    assert client.use_requesty is True
+    fake_router_client.chat.completions.create.assert_called_once()
+    kwargs = fake_router_client.chat.completions.create.call_args.kwargs
+    assert kwargs["model"] == "requesty/glm-4.5"
+    assert reply == "Router reply"
 
 
-def test_requesty_fallbacks_without_api_key(monkeypatch):
-    monkeypatch.setattr(requesty_client.settings, "REQUESTY_API_KEY", "", raising=False)
+def test_chat_completion_returns_deterministic_payload_in_test_mode(monkeypatch):
+    monkeypatch.setattr(requesty_client.settings, "ROUTER_API_KEY", "", raising=False)
     monkeypatch.setattr(requesty_client.settings, "OPENAI_API_KEY", "", raising=False)
+    monkeypatch.setattr(requesty_client.settings, "TEST_MODE", True, raising=False)
 
     client = requesty_client.RequestyClient()
-    assert client.use_requesty is False
+    payload = client.chat_completion([{"role": "user", "content": "Outline the plan"}])
+    parsed = json.loads(payload)
 
-    with patch.object(client, "_openai_chat_completion", return_value="Fallback reply") as mock_fallback:
-        result = client.chat_completion([{"role": "user", "content": "Hello"}])
+    assert "assistant_reply" in parsed
+    assert parsed["actions"]["create_plan"] is False
 
-    assert result == "Fallback reply"
-    mock_fallback.assert_called_once()
+
+def test_embed_texts_fallback(monkeypatch):
+    monkeypatch.setattr(requesty_client.settings, "ROUTER_API_KEY", "", raising=False)
+    monkeypatch.setattr(requesty_client.settings, "OPENAI_API_KEY", "", raising=False)
+    monkeypatch.setattr(requesty_client.settings, "TEST_MODE", True, raising=False)
+
+    client = requesty_client.RequestyClient()
+    vectors = client.embed_texts(["alpha", "beta"])
+
+    assert len(vectors) == 2
+    assert all(len(vec) == 32 for vec in vectors)

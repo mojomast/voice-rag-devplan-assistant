@@ -30,6 +30,10 @@ try:
         monitoring_service, metrics_collector, alert_manager, health_checker,
         initialize_monitoring_system, shutdown_monitoring_system
     )
+    from .database import init_database, shutdown_database
+    from .routers import projects as projects_router
+    from .routers import devplans as devplans_router
+    from .routers import planning_chat as planning_router
 except ImportError:  # pragma: no cover - enables direct module imports in tests
     from config import settings
     from document_processor import DocumentProcessor
@@ -49,6 +53,10 @@ except ImportError:  # pragma: no cover - enables direct module imports in tests
         monitoring_service, metrics_collector, alert_manager, health_checker,
         initialize_monitoring_system, shutdown_monitoring_system
     )
+    from database import init_database, shutdown_database
+    from routers import projects as projects_router
+    from routers import devplans as devplans_router
+    from routers import planning_chat as planning_router
 
 # Configure logging
 logger.add("logs/app.log", rotation="1 day", retention="7 days", level=settings.LOG_LEVEL)
@@ -58,6 +66,11 @@ app = FastAPI(
     description="A voice-enabled document Q&A system with intelligent LLM routing",
     version="1.0.0"
 )
+
+# Register routers for development planning feature
+app.include_router(projects_router.router)
+app.include_router(devplans_router.router)
+app.include_router(planning_router.router)
 
 # Add CORS middleware
 app.add_middleware(
@@ -211,6 +224,7 @@ def cleanup_temp_files(file_paths: List[str]):
 @app.on_event("startup")
 async def startup_event():
     """Initialize performance optimizations, security, and monitoring on startup."""
+    await init_database()
     await initialize_performance_optimizations()
     initialize_security_system()
     await initialize_monitoring_system()
@@ -219,6 +233,7 @@ async def startup_event():
 async def shutdown_event():
     """Clean shutdown of monitoring and other services."""
     await shutdown_monitoring_system()
+    await shutdown_database()
 
 @app.get("/", response_model=SystemStatus)
 @performance_track("health_check")

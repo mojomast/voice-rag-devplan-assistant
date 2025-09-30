@@ -207,3 +207,20 @@ The system is now ready for:
 *Project completed by Claude Code AI Assistant*
 *All development phases successfully delivered*
 *Ready for production deployment and enterprise use*
+
+---
+
+## 🚧 In Progress: Development Planning Assistant Expansion (2025)
+
+| Phase | Scope | Status | Notes |
+|-------|-------|--------|-------|
+| Phase 1 | Core data layer & REST APIs for projects, plans, and conversations | ✅ Completed (2025-09-30) | Implemented async SQLAlchemy models, stores, and FastAPI routers. Added initial migrations and unit tests. |
+| Phase 2 | LLM planning agent & Requesty integration | � In Progress | Core agent modules implemented, Requesty client upgraded, `/planning/chat` now drives real orchestration. |
+| Phase 3 | Frontend experience for planning, project browser, devplan viewer | 🔄 Not started | Streamlit pages to be implemented once backend endpoints stabilise. |
+| Phase 4+ | RAG indexing, voice workflows, advanced features | 🔄 Not started | Pending completion of earlier phases. |
+
+**Next Suggested Steps**
+
+- Finish `/planning/generate` workflow for on-demand plan regeneration.
+- Add integration tests for `/planning/chat` covering Requesty success/fallback paths.
+- Extend documentation with Requesty credential examples and agent telemetry guidelines.

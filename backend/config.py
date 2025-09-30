@@ -46,6 +46,10 @@ class Settings:
     # LLM Settings
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
     TEMPERATURE: float = float(os.getenv("TEMPERATURE", 0.7))
+    REQUESTY_PLANNING_MODEL: str = os.getenv("REQUESTY_PLANNING_MODEL", "requesty/glm-4.5")
+    REQUESTY_EMBEDDING_MODEL: str = os.getenv("REQUESTY_EMBEDDING_MODEL", "requesty/embedding-001")
+    PLANNING_MAX_TOKENS: int = int(os.getenv("PLANNING_MAX_TOKENS", 2200))
+    PLANNING_TEMPERATURE: float = float(os.getenv("PLANNING_TEMPERATURE", 0.4))
 
     # Voice Settings
     TTS_MODEL: str = os.getenv("TTS_MODEL", "tts-1")
@@ -53,6 +57,12 @@ class Settings:
     WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "whisper-1")
     ENABLE_WAKE_WORD: bool = os.getenv("ENABLE_WAKE_WORD", "False").lower() == "true"
     WAKE_WORD: str = os.getenv("WAKE_WORD", "hey assistant")
+
+    # Database Settings
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/devplanning.db")
+    DATABASE_ECHO: bool = os.getenv("DATABASE_ECHO", "false").lower() == "true"
+    DATABASE_POOL_SIZE: int = int(os.getenv("DATABASE_POOL_SIZE", 5))
+    DATABASE_MAX_OVERFLOW: int = int(os.getenv("DATABASE_MAX_OVERFLOW", 10))
 
     # Application Settings
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
@@ -72,6 +82,13 @@ class Settings:
             self.TEST_MODE = explicit_test_mode.lower() == "true"
 
         self.RUNTIME_ADMIN_TOKEN = self._load_admin_token()
+
+        # Normalize database path if using default SQLite location
+        if self.DATABASE_URL.startswith("sqlite"):
+            db_path = self.DATABASE_URL.split("///")[-1]
+            db_dir = os.path.dirname(db_path)
+            if db_dir and not os.path.exists(db_dir):
+                os.makedirs(db_dir, exist_ok=True)
 
     def _load_admin_token(self) -> str:
         """Load and normalize the runtime admin token."""

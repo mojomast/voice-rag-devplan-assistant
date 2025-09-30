@@ -25,6 +25,13 @@ A **production-ready**, enterprise-grade voice-enabled document Q&A system that 
 - **📈 Analytics Dashboard**: Usage analytics, cost tracking, performance insights
 - **🛡️ Security Framework**: Advanced threat detection and incident response
 
+### 🧭 Development Planning Assistant (Phase 2 Expansion)
+- **LLM Planning Agent**: Requesty-powered `PlanningAgent` orchestrates context-aware planning conversations.
+- **Structured Plan Generation**: `DevPlanGenerator` produces markdown devplans with version history via `DevPlanStore`.
+- **Context Manager**: `PlanningContextManager` blends project metadata, recent conversations, and RAG summaries.
+- **FastAPI Planning Chat**: `/planning/chat` now routes through the live agent, persisting generated plans automatically.
+- **Test-Mode Safe**: Deterministic fallbacks enable offline development when Requesty/OpenAI keys are absent.
+
 ## 📋 System Requirements
 
 ### Minimum Requirements
@@ -85,6 +92,7 @@ streamlit run frontend/app.py
 # API available at: http://localhost:8000
 # Web interface at: http://localhost:8501
 # API docs at: http://localhost:8000/docs
+# Planning chat endpoint: http://localhost:8000/planning/chat
 ```
 
 #### Production Mode (Docker)
@@ -105,6 +113,11 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 - Voice transcription/synthesis fall back to deterministic mock responses so tests and demos work without external services.
 - Clear and regenerate the test index by deleting `./vector_store/index.faiss` and restarting the backend or rerunning the tests.
 - Swap API credentials or toggle test mode live from the Streamlit sidebar (`Credentials & Mode`) without restarting services.
+
+### Enabling the Planning Agent
+- Configure Requesty Router credentials in `.env` (`ROUTER_API_KEY`) to access `requesty/glm-4.5` and `requesty/embedding-001`.
+- Optional overrides: `REQUESTY_PLANNING_MODEL`, `REQUESTY_EMBEDDING_MODEL`, `PLANNING_TEMPERATURE`, `PLANNING_MAX_TOKENS`.
+- In TEST_MODE, the agent returns deterministic JSON payloads so downstream tests remain reliable.
 
 ## 🧪 Testing & Quality Assurance
 
@@ -137,6 +150,12 @@ C:/Users/kyle/projects/noteagent/.venv/Scripts/python.exe -m pytest tests/unit
 ```
 
 Pass/fail outcomes are deterministic and do not require network access.
+
+#### Planning Agent Smoke Tests
+```powershell
+C:/Users/kyle/projects/noteagent/.venv/Scripts/python.exe -m pytest tests/unit/test_requesty_client.py tests/unit/test_planning_agent.py -q
+```
+Validates Requesty client routing and the planning agent orchestration without calling external APIs.
 
 ### Load & Performance Testing
 ```bash
@@ -273,6 +292,8 @@ export PASSWORD_MIN_LENGTH=12
 
 ### 📖 Complete Documentation Suite
 - **[📋 Project Status](./PROJECT_STATUS.md)**: Overall project completion and capabilities
+- **[🧭 Development Planning Roadmap](./dev-planning-roadmap.md)**: Phase-by-phase plan for the planning assistant expansion
+- **[⚙️ Dev Planning Setup](./docs/DEVPLANNING_SETUP.md)**: Environment variables, Requesty configuration, and testing guidance
 - **[👤 User Guide](./docs/USER_GUIDE.md)**: Comprehensive end-user documentation
 - **[🔧 Administrator Guide](./docs/ADMIN_GUIDE.md)**: Complete system administration guide
 - **[🏗️ API Documentation](http://localhost:8000/docs)**: Interactive API documentation
@@ -287,12 +308,12 @@ export PASSWORD_MIN_LENGTH=12
 
 ## 🎉 Project Completion Status
 
-**✅ PRODUCTION READY** - All development phases completed successfully!
+**✅ Production system is live, 🚧 Development Planning Assistant expansion is in progress.**
 
-### Development Phases Completed
-- ✅ **Phase 1**: Core RAG functionality and basic features
-- ✅ **Phase 2**: Production infrastructure and optimization
-- ✅ **Phase 3**: Enterprise features and advanced capabilities
+### Development Phases (Historical)
+- ✅ **Core Platform Phases 1-3**: Delivered production-grade voice-enabled RAG system
+- 🚧 **Planning Assistant Phase 2**: Requesty-powered planning agent, context manager, and plan generation
+- ⏳ **Planning Assistant Phases 3-5**: Frontend experience, persistent memory upgrades, and voice workflows
 
 ### Key Achievements
 - **31 Major Features**: All planned features successfully implemented
