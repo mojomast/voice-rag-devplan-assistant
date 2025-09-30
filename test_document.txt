@@ -1,0 +1,83 @@
+Voice-Enabled RAG System Test Document
+
+About Artificial Intelligence
+==============================
+
+Artificial Intelligence (AI) is the simulation of human intelligence processes by machines, especially computer systems. These processes include learning, reasoning, and self-correction.
+
+Types of AI
+-----------
+1. Narrow AI: Designed to perform specific tasks (e.g., voice recognition, image analysis)
+2. General AI: Theoretical AI that could perform any intellectual task a human can do
+3. Superintelligent AI: Hypothetical AI that surpasses human intelligence across all domains
+
+Machine Learning
+----------------
+Machine learning is a subset of AI that focuses on the development of algorithms that can learn from and make predictions or decisions based on data. It includes:
+- Supervised Learning: Training with labeled data
+- Unsupervised Learning: Finding patterns in unlabeled data
+- Reinforcement Learning: Learning through trial and error
+
+Natural Language Processing
+----------------------------
+Natural Language Processing (NLP) enables computers to understand, interpret, and generate human language. Applications include:
+- Text translation
+- Sentiment analysis
+- Chatbots and virtual assistants
+- Document summarization
+
+Vector Databases and RAG
+------------------------
+Retrieval-Augmented Generation (RAG) combines the power of large language models with external knowledge bases. The process involves:
+1. Documents are converted into vector embeddings
+2. User queries are embedded in the same vector space
+3. Similar document chunks are retrieved based on semantic similarity
+4. The language model generates answers using both its training and the retrieved context
+
+This approach improves accuracy and reduces hallucinations in AI responses.
+
+Voice AI Systems
+-----------------
+Voice-enabled AI systems combine multiple technologies:
+- Speech-to-Text (STT): Converting spoken words to text
+- Text-to-Speech (TTS): Generating natural-sounding speech from text
+- Intent Recognition: Understanding user requests
+- Context Management: Maintaining conversation state
+
+These systems power virtual assistants like Siri, Alexa, and Google Assistant.
+
+Benefits of AI
+--------------
+- Increased efficiency and productivity
+- 24/7 availability
+- Reduction in human error
+- Ability to process vast amounts of data
+- Automation of repetitive tasks
+
+Challenges in AI Development
+-----------------------------
+- Data privacy and security concerns
+- Ethical considerations and bias
+- High computational costs
+- Need for large training datasets
+- Interpretability and explainability
+
+Future of AI
+------------
+The future of AI includes:
+- More sophisticated natural language understanding
+- Improved reasoning and common sense
+- Better integration with human workflows
+- Enhanced multimodal AI (combining vision, language, and audio)
+- Edge AI for faster, more private processing
+
+Conclusion
+----------
+Artificial Intelligence continues to evolve rapidly, transforming industries and creating new possibilities. Understanding AI technologies like RAG, voice processing, and machine learning is essential for developing modern intelligent systems.
+
+Test Questions for This Document:
+- What is artificial intelligence?
+- What are the types of AI?
+- How does RAG work?
+- What technologies are used in voice AI systems?
+- What are the benefits and challenges of AI?

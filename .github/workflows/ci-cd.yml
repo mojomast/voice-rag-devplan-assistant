@@ -1,0 +1,485 @@
+name: Voice RAG System CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ===== Code Quality and Testing =====
+  code-quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.10.x, 3.11.x]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+        pip install flake8 black isort mypy safety bandit
+
+    - name: Code formatting check (Black)
+      run: black --check --diff backend/ frontend/ tests/
+
+    - name: Import sorting check (isort)
+      run: isort --check-only --diff backend/ frontend/ tests/
+
+    - name: Linting (flake8)
+      run: flake8 backend/ frontend/ tests/ --max-line-length=100 --ignore=E203,W503
+
+    - name: Type checking (mypy)
+      run: mypy backend/ --ignore-missing-imports
+
+    - name: Security scan (bandit)
+      run: bandit -r backend/ -f json -o bandit-report.json
+      continue-on-error: true
+
+    - name: Dependency vulnerability scan (safety)
+      run: safety check --json --output safety-report.json
+      continue-on-error: true
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports-${{ matrix.python-version }}
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  # ===== Unit and Integration Tests =====
+  test:
+    runs-on: ubuntu-latest
+    needs: code-quality
+    strategy:
+      matrix:
+        python-version: [3.10.x, 3.11.x]
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: voice_rag_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tesseract-ocr libtesseract-dev
+        sudo apt-get install -y ffmpeg libsm6 libxext6
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+
+    - name: Set up test environment
+      run: |
+        mkdir -p temp_audio vector_store uploads logs
+        cp .env.template .env.test
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_TEST }}
+        POSTGRES_PASSWORD: test_password
+        REDIS_URL: redis://localhost:6379
+
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ -v --cov=backend --cov-report=xml --cov-report=html
+      env:
+        ENVIRONMENT: test
+        LOG_LEVEL: DEBUG
+
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v --tb=short
+      env:
+        ENVIRONMENT: test
+        API_URL: http://localhost:8000
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Upload test artifacts
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-${{ matrix.python-version }}
+        path: |
+          htmlcov/
+          pytest-report.xml
+
+  # ===== Performance and Load Testing =====
+  performance-test:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11.x
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+
+    - name: Start application stack
+      run: |
+        docker-compose up -d
+        sleep 30  # Wait for services to be ready
+
+    - name: Wait for application readiness
+      run: |
+        timeout 60 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+
+    - name: Run performance benchmarks
+      run: |
+        python tests/benchmark_performance.py --output-file performance-report.json
+      env:
+        API_URL: http://localhost:8000
+
+    - name: Run load tests
+      run: |
+        python tests/load_test.py --users 10 --requests 50 --output-file load-test-report.json
+      env:
+        API_URL: http://localhost:8000
+
+    - name: Upload performance reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-reports
+        path: |
+          performance-report.json
+          load-test-report.json
+
+    - name: Performance regression check
+      run: |
+        python .github/scripts/check_performance_regression.py performance-report.json
+      continue-on-error: true
+
+  # ===== Security Scanning =====
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: code-quality
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    - name: Container security scan
+      run: |
+        docker build -t voice-rag-security-test -f docker/Dockerfile .
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+          aquasec/trivy image voice-rag-security-test
+
+  # ===== Build Docker Images =====
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Backend image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build and push Frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./docker/Dockerfile.frontend
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta.outputs.tags }}-frontend
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # ===== End-to-End Testing =====
+  e2e-test:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js for Playwright
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install Playwright
+      run: |
+        npm install @playwright/test
+        npx playwright install --with-deps
+
+    - name: Start application with Docker Compose
+      run: |
+        docker-compose up -d
+        sleep 60  # Extended wait for full stack readiness
+
+    - name: Wait for services
+      run: |
+        timeout 120 bash -c 'until curl -f http://localhost:8501; do sleep 5; done'
+        timeout 120 bash -c 'until curl -f http://localhost:8000/health; do sleep 5; done'
+
+    - name: Run Playwright E2E tests
+      run: npx playwright test
+      env:
+        FRONTEND_URL: http://localhost:8501
+        API_URL: http://localhost:8000
+
+    - name: Upload E2E test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: e2e-test-results
+        path: |
+          test-results/
+          playwright-report/
+
+  # ===== Deployment to Staging =====
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [build, e2e-test]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.AWS_REGION }}
+
+    - name: Deploy to ECS Staging
+      run: |
+        aws ecs update-service \
+          --cluster ${{ vars.ECS_CLUSTER_STAGING }} \
+          --service ${{ vars.ECS_SERVICE_STAGING }} \
+          --force-new-deployment
+
+    - name: Wait for deployment
+      run: |
+        aws ecs wait services-stable \
+          --cluster ${{ vars.ECS_CLUSTER_STAGING }} \
+          --services ${{ vars.ECS_SERVICE_STAGING }}
+
+    - name: Run smoke tests against staging
+      run: |
+        python .github/scripts/smoke_tests.py --url ${{ vars.STAGING_URL }}
+
+  # ===== Deployment to Production =====
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build, e2e-test]
+    if: github.event_name == 'release'
+    environment: production
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.AWS_REGION }}
+
+    - name: Deploy to ECS Production
+      run: |
+        aws ecs update-service \
+          --cluster ${{ vars.ECS_CLUSTER_PRODUCTION }} \
+          --service ${{ vars.ECS_SERVICE_PRODUCTION }} \
+          --force-new-deployment
+
+    - name: Wait for deployment
+      run: |
+        aws ecs wait services-stable \
+          --cluster ${{ vars.ECS_CLUSTER_PRODUCTION }} \
+          --services ${{ vars.ECS_SERVICE_PRODUCTION }}
+
+    - name: Run production smoke tests
+      run: |
+        python .github/scripts/smoke_tests.py --url ${{ vars.PRODUCTION_URL }}
+
+    - name: Notify deployment success
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        channel: '#deployments'
+        text: 'Voice RAG System successfully deployed to production! 🚀'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # ===== Cleanup and Notifications =====
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+
+    steps:
+    - name: Clean up old container images
+      run: |
+        # Keep only the last 10 images
+        echo "Cleaning up old container images..."
+        # This would typically clean up old images from the registry
+
+    - name: Generate deployment report
+      run: |
+        echo "## Deployment Summary" > deployment-report.md
+        echo "- Build: ${{ github.sha }}" >> deployment-report.md
+        echo "- Tests: ${{ needs.test.result }}" >> deployment-report.md
+        echo "- Security: ${{ needs.security-scan.result }}" >> deployment-report.md
+        echo "- Performance: ${{ needs.performance-test.result }}" >> deployment-report.md
+
+    - name: Upload deployment report
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-report
+        path: deployment-report.md
+
+# ===== Workflow Notifications =====
+  notify-failure:
+    runs-on: ubuntu-latest
+    needs: [code-quality, test, security-scan, build, e2e-test]
+    if: failure()
+
+    steps:
+    - name: Notify failure
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        channel: '#ci-cd'
+        text: 'Voice RAG System CI/CD pipeline failed! 🚨'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

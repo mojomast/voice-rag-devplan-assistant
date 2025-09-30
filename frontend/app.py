@@ -22,12 +22,18 @@ def make_api_request(endpoint, method="GET", **kwargs):
     """Make API request with error handling"""
     try:
         url = f"{API_URL}{endpoint}"
+        headers = kwargs.pop("headers", {})
+        admin_token = st.session_state.get("admin_token") if "admin_token" in st.session_state else ""
+
+        if admin_token:
+            headers = {**headers, "Authorization": f"Bearer {admin_token}"}
+
         if method == "GET":
-            response = requests.get(url, timeout=60, **kwargs)
+            response = requests.get(url, timeout=60, headers=headers, **kwargs)
         elif method == "POST":
-            response = requests.post(url, timeout=60, **kwargs)
+            response = requests.post(url, timeout=60, headers=headers, **kwargs)
         elif method == "DELETE":
-            response = requests.delete(url, timeout=60, **kwargs)
+            response = requests.delete(url, timeout=60, headers=headers, **kwargs)
         else:
             raise ValueError(f"Unsupported method: {method}")
 
@@ -52,9 +58,18 @@ st.markdown("---")
 
 # --- System Status in Header ---
 with st.container():
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     system_status = get_system_status()
+
+    if "admin_token" not in st.session_state:
+        default_token = os.getenv("DEFAULT_ADMIN_TOKEN")
+        if default_token:
+            st.session_state["admin_token"] = default_token
+        elif system_status.get("test_mode"):
+            st.session_state["admin_token"] = "test-admin-token"
+        else:
+            st.session_state["admin_token"] = ""
 
     with col1:
         if system_status.get("status") == "healthy":
@@ -76,6 +91,12 @@ with st.container():
             st.warning("💰 Direct OpenAI")
 
     with col4:
+        if system_status.get("test_mode"):
+            st.warning("🧪 Test mode active")
+        else:
+            st.success("🚀 Live mode")
+
+    with col5:
         if system_status.get("wake_word_enabled"):
             st.success("🎙️ Wake word enabled")
         else:
@@ -83,6 +104,84 @@ with st.container():
 
 # --- Sidebar ---
 with st.sidebar:
+    st.header("⚙️ Runtime Settings")
+    with st.expander("Credentials & Mode", expanded=False):
+        current_test_mode = bool(system_status.get("test_mode"))
+        st.caption("Update API credentials or toggle offline test mode. Leave fields blank to keep current values.")
+
+        with st.form("runtime_settings_form"):
+            default_admin_token = st.session_state.get("admin_token", "")
+            requesty_key_input = st.text_input(
+                "Requesty API Key",
+                type="password",
+                placeholder="Leave blank to keep existing",
+                help="Provide a new Requesty.ai key or leave blank to keep the current value"
+            )
+            clear_requesty_key = st.checkbox("Clear Requesty key", value=False)
+
+            openai_key_input = st.text_input(
+                "OpenAI API Key",
+                type="password",
+                placeholder="Leave blank to keep existing",
+                help="Provide a new OpenAI key or leave blank to keep the current value"
+            )
+            clear_openai_key = st.checkbox("Clear OpenAI key", value=False)
+
+            admin_token_input = st.text_input(
+                "Admin Access Token",
+                type="password",
+                placeholder="Required to authenticate runtime updates",
+                help="Token required by the backend to update configuration. Default in test mode: test-admin-token",
+                value=default_admin_token
+            )
+
+            force_test_mode = st.checkbox("Force Test Mode (offline)", value=current_test_mode)
+
+            apply_settings = st.form_submit_button("Apply Settings", use_container_width=True)
+
+        if apply_settings:
+            st.session_state["admin_token"] = admin_token_input.strip()
+            payload = {"test_mode": force_test_mode}
+
+            if clear_requesty_key:
+                payload["requesty_api_key"] = ""
+            elif requesty_key_input:
+                payload["requesty_api_key"] = requesty_key_input
+
+            if clear_openai_key:
+                payload["openai_api_key"] = ""
+            elif openai_key_input:
+                payload["openai_api_key"] = openai_key_input
+
+            with st.spinner("Updating configuration..."):
+                response, error = make_api_request("/config/update", "POST", json=payload)
+
+            if error:
+                st.error(f"Configuration update failed: {error}")
+            elif response and response.status_code == 200:
+                data = response.json()
+                st.success("Runtime configuration updated")
+                st.info(
+                    f"Test mode: {'ON' if data.get('test_mode') else 'OFF'} | "
+                    f"Requesty: {'Enabled' if data.get('requesty_enabled') else 'Disabled'}"
+                )
+                # Clear chat history to avoid stale context
+                if 'chat_history' in st.session_state:
+                    st.session_state.chat_history = []
+                time.sleep(1)
+                st.rerun()
+            else:
+                if response is None:
+                    error_detail = "Unknown error"
+                else:
+                    try:
+                        error_payload = response.json()
+                        error_detail = error_payload.get("detail") or response.text
+                    except ValueError:
+                        error_detail = response.text
+                st.error(f"Configuration update failed: {error_detail}")
+
+    st.markdown("---")
     st.header("📄 Document Management")
 
     # File Upload Section
@@ -319,5 +418,18 @@ if 'chat_history' in st.session_state and st.session_state.chat_history:
                     })
 
 # --- Footer ---
+
+
+if __name__ == "__main__":
+    import os
+    import sys
+
+    sentinel = "VOICE_RAG_STREAMLIT_BOOTSTRAPPED"
+    already_streamlit = os.environ.get("STREAMLIT_SERVER_RUNNING") == "1"
+    already_bootstrapped = os.environ.get(sentinel) == "1"
+
+    if not (already_streamlit or already_bootstrapped):
+        os.environ[sentinel] = "1"
+        os.execv(sys.executable, [sys.executable, "-m", "streamlit", "run", __file__])
 st.markdown("---")
 st.caption("💡 Tip: Upload documents first, then ask questions about their content. Use voice input for hands-free interaction.")

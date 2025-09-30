@@ -10,12 +10,13 @@ This guide will walk you through setting up the Voice-Enabled RAG System from sc
 - **Memory**: 4GB RAM minimum (8GB recommended)
 - **Storage**: 2GB free space
 
-### Required API Keys
-- **OpenAI API Key**: Required for LLM, embeddings, and voice services
+### API Keys & Test Mode
+- **OpenAI API Key**: Recommended for production (LLM, embeddings, and voice services)
   - Get it from: https://platform.openai.com/api-keys
   - Ensure you have credits available
 - **Requesty.ai API Key**: Optional, for cost optimization
   - Get it from: https://requesty.ai (if available)
+- **Offline/Test Mode**: If keys are missing or you set `TEST_MODE=true`, the system runs entirely offline using deterministic FakeEmbeddings, synthetic voice responses, and an auto-generated FAISS vector store under `./vector_store`.
 
 ## 🚀 Installation Steps
 
@@ -81,7 +82,7 @@ pip list | grep -E "(langchain|fastapi|streamlit|openai)"
 # Copy the template
 cp .env.template .env
 
-# Edit the .env file with your API keys
+# Edit the .env file with your API keys (or set TEST_MODE=true for offline usage)
 # On Windows:
 notepad .env
 # On macOS:
@@ -92,11 +93,14 @@ nano .env
 
 **Required configuration in `.env`:**
 ```env
-# REQUIRED: Your OpenAI API key
+# OPTIONAL: Your OpenAI API key (omit to stay offline)
 OPENAI_API_KEY="sk-your-actual-openai-key-here"
 
 # OPTIONAL: For cost optimization
 REQUESTY_API_KEY="your_requesty_key_here"
+
+# Force offline/test mode (auto-detected when API keys are absent)
+TEST_MODE=true
 
 # File paths (defaults should work)
 VECTOR_STORE_PATH="./vector_store"
@@ -120,6 +124,8 @@ mkdir -p vector_store uploads temp_audio logs
 ls -la
 ```
 
+> ℹ️ **Note:** Starting the backend or running the unit tests while `TEST_MODE` is enabled will automatically populate `./vector_store` with a small synthetic FAISS index that keeps answers deterministic for local development.
+
 ### Step 6: Test Configuration
 ```bash
 # Test that configuration loads correctly
@@ -129,8 +135,16 @@ print('✅ Configuration loaded successfully')
 print(f'OpenAI API Key: {settings.OPENAI_API_KEY[:10]}...')
 print(f'Vector Store Path: {settings.VECTOR_STORE_PATH}')
 print(f'Upload Path: {settings.UPLOAD_PATH}')
+print(f'Test Mode: {settings.TEST_MODE}')
 "
 ```
+
+### Step 7: Run Offline-Ready Unit Tests
+```powershell
+C:/Users/kyle/projects/noteagent/.venv/Scripts/python.exe -m pytest tests/unit
+```
+
+The synthetic vector store and offline voice/document fallbacks ensure this command succeeds without any external API keys or network connectivity.
 
 ## 🚦 Running the System
 
