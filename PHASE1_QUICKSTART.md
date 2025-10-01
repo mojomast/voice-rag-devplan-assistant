@@ -1,4 +1,5 @@
 # Phase 1 Quick Start Guide
+> **Update — 2025-09-30:** Phases 1 & 2 are complete. Use `docs/DEVPLANNING_SETUP.md` for the current end-to-end setup; keep this guide handy for historical Phase 1 implementation details.
 ## Core Data Layer & API Implementation
 
 This guide will help you implement Phase 1 of the Development Planning feature in 1-2 days.

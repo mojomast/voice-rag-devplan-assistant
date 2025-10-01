@@ -2,19 +2,19 @@
 
 Transform the voice-rag-system into an intelligent development planning assistant that helps developers create and iterate on development plans via conversational LLM, remembers all projects and past conversations, allows voice and text interaction for creating devplans, persists all planning documents and iterations in the vector store, and provides project-aware context for continuing work across sessions.
 
-> **Status Snapshot — 2025-09-30**
+> **Status Snapshot — 2025-09-30 (UPDATED)**
 >
 > • **Phase 1 complete**: Async database layer, SQLAlchemy models, storage services, FastAPI routers, and unit tests are live (see `backend/` and `tests/unit/test_*_store.py`).<br>
-> • **Deployment artifacts**: Requirements updated with async SQLAlchemy stack, migrations added under `backend/migrations/`, and documentation refreshed (`docs/DEVPLANNING_SETUP.md`, `PHASE1_QUICKSTART.md`, `PROJECT_STATUS.md`).<br>
-> • **Next up (Phase 2)**: Implement the Requesty-powered planning agent, context manager, and devplan generation pipeline; wire `/planning/chat` to real agent logic; extend tests to cover the agent behavior.
+> • **Phase 2 complete**: `PlanningAgent`, `DevPlanGenerator`, and `PlanningContextManager` implemented with Requesty integration; `/planning/chat` endpoint fully functional with real agent orchestration; comprehensive test suite (29 tests) covering unit, integration, and E2E scenarios; structured telemetry with timing metrics added.<br>
+> • **Phase 3 in progress**: Streamlit planning suite (`planning_chat`, `project_browser`, `devplan_viewer`) landed as a baseline; backlog below captures the remaining UX polish, real-time updates, and review workflows required for sign-off.
 
 ## Phase Progress Dashboard
 
 | Phase | Scope | Status (2025-09-30) | Notes |
 |-------|-------|----------------------|-------|
 | Phase 1 | Core data layer & REST APIs | ✅ Completed | Backend models (`backend/models.py`), stores (`backend/storage/`), routers, migrations, and unit tests shipped. |
-| Phase 2 | LLM planning agent & Requesty integration | 🔄 Ready to start | Implement `PlanningAgent`, `DevPlanGenerator`, `PlanningContextManager`, integrate Requesty APIs, and replace `/planning/chat` stub. |
-| Phase 3 | Frontend experience | ⏳ Blocked on Phase 2 | Streamlit planning UI, project browser, and devplan viewer pending agent outputs. |
+| Phase 2 | LLM planning agent & Requesty integration | ✅ Completed (2025-09-30) | `PlanningAgent`, `DevPlanGenerator`, `PlanningContextManager` with Requesty integration, comprehensive test coverage (29 tests), and telemetry logging. |
+| Phase 3 | Frontend experience | �️ In progress | Streamlit planning suite baseline merged (chat, browser, viewer); remaining backlog covers UX polish, live updates, and review workflows. |
 | Phase 4 | RAG indexing & memory | ⏳ Blocked on earlier phases | Vector-store ingest for plans/projects once agent workflow exists. |
 | Phase 5+ | Voice + advanced features | ⏳ Future | Voice planning pipeline, collaboration, analytics, etc. |
 
@@ -35,9 +35,11 @@ Transform the voice-rag-system into an intelligent development planning assistan
 - [x] **Requesty Integration**
     - `backend/requesty_client.py` upgraded for Requesty Router models (`requesty/glm-4.5`, `requesty/embedding-001`) plus async wrappers and deterministic test fallbacks.
     - `docs/DEVPLANNING_SETUP.md` updated with credential guidance and tunable planning parameters.
-- [ ] **Testing & Telemetry**
-    - Unit tests cover agent flows and Requesty fallbacks; integration telemetry still pending.
-    - Update `PROJECT_STATUS.md` and capture run commands/output in the repo logs after telemetry wiring.
+- [x] **Testing & Telemetry**
+    - ✅ Unit tests added: `tests/unit/test_planning_agent.py` (6 tests), `tests/unit/test_plan_generator.py` (10 tests)
+    - ✅ Integration tests added: `tests/integration/test_planning_chat.py` (13 endpoint tests)
+    - ✅ Telemetry implemented: Structured logging with timing metrics in `planning_agent.py` and `plan_generator.py`
+    - ✅ All tests passing: 16 unit tests + 13 integration tests covering agent flows, Requesty fallbacks, and E2E scenarios
 
 Refer back to the detailed Phase sections below for design intent, but treat the checklist above as the canonical starting point.
 
@@ -274,148 +276,80 @@ This phase introduces the core LLM functionality using **glm-4.5 via Requesty AP
 
 The frontend interfaces with the backend APIs without direct model calls, utilizing Requesty for chat functionality and OpenAI for voice processing through backend endpoints.
 
-#### 3.1 Planning Chat Interface
-**File**: `frontend/pages/planning_chat.py`
-```python
-"""
-New page: Development Planning Chat
+#### 3.1 Planning Chat Interface (`frontend/pages/planning_chat.py`)
 
-Features:
-- Chat interface for planning conversations
-- Voice and text input
-- Project selector (work on existing or create new)
-- Live devplan preview as it's generated
-- Export/save devplan buttons
-"""
+**Delivered**
 
-st.title("🗺️ Development Planning Assistant")
+- Multi-session planning conversations with persisted history, generated plan tracking, and automatic plan preview loading.
+- Voice capture through `native_audio_recorder` with `/voice/transcribe-base64` hand-off, plus inline project creation and selection.
+- Error handling and toast-based notifications for API failures, along with plan metadata surfacing inside expandable previews.
 
-# Project selector
-project = st.selectbox("Select Project", ["New Project", *existing_projects])
+**Outstanding Enhancements**
 
-# Chat interface (similar to main chat, but planning-focused)
-for message in st.session_state.planning_chat:
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
+- Live refresh of messages and generated plans (polling or websocket bridge) so the UI updates without manual reruns.
+- Quick actions for approving/archiving plans, continuing edits, and deep-linking into the DevPlan viewer after generation.
+- Playback of synthesized assistant responses using the TTS stack and richer status chips for metadata (priority, estimates, owners).
+- Saved prompt templates / recent prompts to help seed common planning flows directly from the chat tab.
 
-# Input
-user_input = st.chat_input("Describe what you want to build...")
+#### 3.2 Project Browser (`frontend/pages/project_browser.py`)
 
-# Voice input button
-if st.button("🎤 Voice Input"):
-    # Record and transcribe
-    pass
+**Delivered**
 
-# If devplan is generated, show preview and save options
-if generated_plan:
-    with st.expander("📋 Generated Development Plan"):
-        st.markdown(generated_plan.content)
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.button("💾 Save Plan")
-        with col2:
-            st.download_button("📥 Download", generated_plan.content)
-        with col3:
-            st.button("✏️ Continue Editing")
-```
+- Server-driven project list with search, status filters, and tag filtering; metrics for plan and conversation counts per project.
+- Detail pane that surfaces latest plans, quick-open shortcuts into planning chat and devplan viewer, and conversation summaries.
+- Session state wiring so cross-page navigation (project → chat/viewer) keeps context without re-selecting items.
 
-#### 3.2 Project Browser
-**File**: `frontend/pages/project_browser.py`
-```python
-"""
-Browse all projects and their associated devplans.
+**Outstanding Enhancements**
 
-Features:
-- Grid/list view of projects
-- Filter by status, tags, date
-- Quick stats (plan count, last updated)
-- Click to view project details and plans
-"""
+- Project health snapshot widgets (latest plan status, velocity, backlog size) powered by planning metadata.
+- RAG-driven "related projects" sidebar and quick filters (e.g., show projects missing approved plans).
+- Bulk operations (archive, tag, export) and CSV/Markdown export of project summaries for stakeholder reporting.
+- Highlight recently updated conversations and expose agent confidence / telemetry metrics.
 
-st.title("📁 Projects")
+#### 3.3 DevPlan Viewer & Editor (`frontend/pages/devplan_viewer.py`)
 
-# Filters
-col1, col2, col3 = st.columns(3)
-with col1:
-    status_filter = st.selectbox("Status", ["All", "Active", "Paused", "Completed"])
-with col2:
-    tag_filter = st.multiselect("Tags", all_tags)
-with col3:
-    sort_by = st.selectbox("Sort by", ["Recent", "Name", "Plan Count"])
+**Delivered**
 
-# Projects grid
-for project in filtered_projects:
-    with st.container():
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.subheader(project.name)
-            st.caption(project.description)
-            st.text(f"Plans: {project.plan_count} | Updated: {project.updated_at}")
-        with col2:
-            if st.button("View", key=f"view_{project.id}"):
-                st.session_state.selected_project = project.id
-                st.switch_page("pages/project_details.py")
-```
+- Metadata sidebar, markdown rendering, JSON/markdown exports, and version history with unified diffs between selected versions.
+- Plan metadata editing (title/status/metadata), new version creation with change summaries, and version-level metadata overrides.
+- Automatic project/plan pre-selection when navigated from other Streamlit pages, plus diff viewer for historical comparisons.
 
-#### 3.3 DevPlan Viewer/Editor
-**File**: `frontend/pages/devplan_viewer.py`
-```python
-"""
-View and edit development plans.
+**Outstanding Enhancements**
 
-Features:
-- Markdown rendering with syntax highlighting
-- Side-by-side edit/preview mode
-- Version history timeline
-- Diff viewer for comparing versions
-- Export options (MD, PDF, JSON)
-"""
+- Collaborative review tooling (comments, approvals, change requests) and inline suggestions surfaced from the planning agent.
+- Visual diff summarisation (highlights, bullet summaries) and printable/PDF exports for executive reviews.
+- Automated regression checks before publishing a new version (linting, template adherence, required metadata fields).
+- Plan template application and comparison (overlay templates to identify missing sections).
 
-# Plan viewer with tabs
-tab1, tab2, tab3 = st.tabs(["📄 View", "✏️ Edit", "🕐 History"])
+#### 3.4 Navigation Shell (`frontend/app.py`)
 
-with tab1:
-    # Rendered markdown view
-    st.markdown(plan.content)
-    
-    # Metadata sidebar
-    with st.sidebar:
-        st.metric("Version", plan.version)
-        st.metric("Status", plan.status)
-        st.date_input("Created", plan.created_at)
+- Sidebar now links the new planning pages alongside existing chat/analytics experiences; add badges or notification dots once real-time updates land.
+- Outstanding: consolidate global state (selected project/plan) into a shared store and surface a "Planning" landing page with quick links to active work.
 
-with tab2:
-    # Markdown editor
-    edited_content = st.text_area("Edit Plan", plan.content, height=600)
-    
-    if st.button("💾 Save Changes"):
-        # Create new version
-        pass
+#### 3.5 Feature Inventory & Outstanding Work
 
-with tab3:
-    # Version history
-    for version in plan_versions:
-        with st.expander(f"Version {version.number} - {version.created_at}"):
-            st.markdown(version.content)
-            if st.button("View Diff", key=f"diff_{version.id}"):
-                # Show diff
-                pass
-```
+**Delivered Baseline (2025-09-30)**
 
-#### 3.4 Update Main Navigation
-**File**: `frontend/app.py`
-```python
-# Add new pages to sidebar navigation
-pages = {
-    "🏠 Home": "home",
-    "💬 Chat": "chat",
-    "🗺️ Planning": "planning_chat",  # NEW
-    "📁 Projects": "project_browser",  # NEW
-    "📋 Dev Plans": "devplan_viewer",  # NEW
-    "📊 Analytics": "analytics",
-}
-```
+- `frontend/pages/planning_chat.py` supports multi-session management, voice capture, automatic plan preview loading, and inline project provisioning.
+- `frontend/pages/project_browser.py` offers search, filters, quick-open shortcuts into chat/viewer flows, and conversation listings per project.
+- `frontend/pages/devplan_viewer.py` provides metadata editing, version history with unified diffs, markdown/JSON exports, and new-version workflows.
+
+**Outstanding UX Enhancements (required for Phase 3 sign-off)**
+
+- Real-time refresh of chat transcripts, generated plans, and project stats (polling/websocket channel backing the planning endpoints).
+- Inline guidance and validation for plan approvals: quick actions to mark plans `in_progress`/`approved`, archive, or reopen directly from previews.
+- Session timeline view (message + plan generation history) with voice playback of assistant responses using the TTS pipeline.
+- Project health widgets: surfaced burndown/plan velocity summaries, latest plan metadata chips, and quick links to version comparisons.
+- Rich notifications: toast + email/Slack hooks when new plans or versions are generated (ties into monitoring stack).
+- Accessibility & responsiveness audit for the Streamlit UI (keyboard navigation, screen reader labels, narrow viewport layouts).
+- Inline prompt scaffolding: saved prompts / templates to seed new planning requests from the UI.
+
+**QA, Telemetry, and Definition of Done**
+
+1. Add Streamlit/Playwright regression tests that cover plan generation, version diffing, and project navigation.
+2. Extend telemetry to capture frontend usage metrics (page events, plan creation funnels) and emit them through the existing logging pipeline.
+3. Document an end-to-end smoke script (`tests/e2e/test_planning_ui.py` placeholder) that provisions a project, generates a plan, edits metadata, and exports markdown.
+4. Demo checklist: voice chat → plan generation → approval flow → project browser drill-down → version comparison without manual page refreshes.
 
 ### Phase 4: RAG Integration & Indexing (Week 4)
 

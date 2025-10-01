@@ -25,12 +25,19 @@ A **production-ready**, enterprise-grade voice-enabled document Q&A system that 
 - **📈 Analytics Dashboard**: Usage analytics, cost tracking, performance insights
 - **🛡️ Security Framework**: Advanced threat detection and incident response
 
-### 🧭 Development Planning Assistant (Phase 2 Expansion)
-- **LLM Planning Agent**: Requesty-powered `PlanningAgent` orchestrates context-aware planning conversations.
+### 🧭 Development Planning Assistant (Phase 2 Delivery + Phase 3 Frontend In Progress)
+
+> **Status — 2025-09-30**: Agent backend (Phases 1 & 2) is live and the Streamlit planning suite baseline has landed; remaining UX polish, real-time updates, and collaboration tooling are tracked in `dev-planning-roadmap.md`.
+
+- **LLM Planning Agent**: Requesty-powered `PlanningAgent` orchestrates context-aware planning conversations across projects.
 - **Structured Plan Generation**: `DevPlanGenerator` produces markdown devplans with version history via `DevPlanStore`.
-- **Context Manager**: `PlanningContextManager` blends project metadata, recent conversations, and RAG summaries.
-- **FastAPI Planning Chat**: `/planning/chat` now routes through the live agent, persisting generated plans automatically.
-- **Test-Mode Safe**: Deterministic fallbacks enable offline development when Requesty/OpenAI keys are absent.
+- **Context Manager**: `PlanningContextManager` blends project metadata, recent conversations, and RAG summaries for richer prompts.
+- **FastAPI Planning Chat**: `/planning/chat` routes through the live agent, persisting generated plans automatically.
+- **Requesty Integration**: `requesty/glm-4.5` + `requesty/embedding-001` wired in via `requesty_client.py` with async fallbacks and deterministic TEST_MODE.
+- **Comprehensive Testing**: 29 green tests spanning unit (`tests/unit/test_planning_agent.py`, `test_plan_generator.py`) and integration (`tests/integration/test_planning_chat.py`) pipelines.
+- **Structured Telemetry**: Timing metrics and structured logs land in `planning_agent.py`/`plan_generator.py` for observability.
+- **Streamlit Planning Suite (Phase 3 baseline)**: `frontend/pages/planning_chat.py`, `project_browser.py`, and `devplan_viewer.py` provide chat + voice planning flows, project browsing with filters, plan metadata editing, and version diffing.
+- **Phase 3 Backlog**: Real-time updates, approval workflows, notifications, and accessibility improvements are the next milestones before marking the frontend phase complete.
 
 ## 📋 System Requirements
 
@@ -308,14 +315,18 @@ export PASSWORD_MIN_LENGTH=12
 
 ## 🎉 Project Completion Status
 
-**✅ Production system is live, 🚧 Development Planning Assistant expansion is in progress.**
+**✅ Production system is live · ✅ Development Planning Phases 1-2 delivered · �️ Phase 3 frontend polish underway.**
 
-### Development Phases (Historical)
+### Development Phases
 - ✅ **Core Platform Phases 1-3**: Delivered production-grade voice-enabled RAG system
-- 🚧 **Planning Assistant Phase 2**: Requesty-powered planning agent, context manager, and plan generation
-- ⏳ **Planning Assistant Phases 3-5**: Frontend experience, persistent memory upgrades, and voice workflows
+- ✅ **Planning Assistant Phase 1**: Async data layer, stores, and planning APIs in place
+- ✅ **Planning Assistant Phase 2 (2025-09-30)**: Requesty-powered planning agent, context manager, structured plan generator, telemetry, and 29-test suite delivered
+- �️ **Planning Assistant Phase 3 (Frontend)**: Streamlit planning suite baseline shipped; implement live updates, approval workflows, and notifications before sign-off
+- ⏳ **Planning Assistant Phases 4-5**: Persistent memory upgrades, RAG ingest, and voice-first planning workflows
 
 ### Key Achievements
+- **Planning Assistant Phase 2 Delivered**: Requesty-integrated agent, structured plan generator, context manager, and telemetry shipped with 29 passing unit/integration tests.
+- **Phase 3 Streamlit Baseline**: Planning chat, project browser, and devplan viewer pages live with voice capture, plan metadata editing, and version diffing.
 - **31 Major Features**: All planned features successfully implemented
 - **Enterprise Security**: Comprehensive threat detection and security framework
 - **Production Monitoring**: Real-time metrics, alerting, and health checks
