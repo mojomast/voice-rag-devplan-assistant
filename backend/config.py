@@ -36,6 +36,14 @@ class Settings:
 
     # File Paths
     VECTOR_STORE_PATH: str = os.getenv("VECTOR_STORE_PATH", "./vector_store")
+    DEVPLAN_VECTOR_STORE_PATH: str = os.getenv(
+        "DEVPLAN_VECTOR_STORE_PATH",
+        os.path.join(VECTOR_STORE_PATH, "devplans"),
+    )
+    PROJECT_VECTOR_STORE_PATH: str = os.getenv(
+        "PROJECT_VECTOR_STORE_PATH",
+        os.path.join(VECTOR_STORE_PATH, "projects"),
+    )
     UPLOAD_PATH: str = os.getenv("UPLOAD_PATH", "./uploads")
 
     # RAG Settings
@@ -89,6 +97,18 @@ class Settings:
             db_dir = os.path.dirname(db_path)
             if db_dir and not os.path.exists(db_dir):
                 os.makedirs(db_dir, exist_ok=True)
+
+        for path in (
+            self.VECTOR_STORE_PATH,
+            self.DEVPLAN_VECTOR_STORE_PATH,
+            self.PROJECT_VECTOR_STORE_PATH,
+            self.UPLOAD_PATH,
+        ):
+            try:
+                if path:
+                    os.makedirs(path, exist_ok=True)
+            except OSError as exc:  # pragma: no cover - best-effort directory creation
+                logger.warning("Failed to ensure directory %s: %s", path, exc)
 
     def _load_admin_token(self) -> str:
         """Load and normalize the runtime admin token."""

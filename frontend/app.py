@@ -277,6 +277,20 @@ with st.sidebar:
                 memory = stats["memory"]
                 st.info(f"💭 Messages: {memory.get('message_count', 0)}")
 
+    st.markdown("---")
+    st.subheader("🧭 Planning Assistant")
+    nav_links = [
+        ("pages/planning_chat.py", "🗺️ Planning Chat"),
+        ("pages/project_browser.py", "📁 Project Browser"),
+        ("pages/devplan_viewer.py", "📋 DevPlan Viewer"),
+    ]
+    if hasattr(st, "page_link"):
+        for path, label in nav_links:
+            st.page_link(path, label=label)
+    else:  # pragma: no cover - legacy fallback for older Streamlit versions
+        for path, label in nav_links:
+            st.markdown(f"[{label}](/{path})")
+
 # --- Main Chat Interface ---
 st.header("💬 Chat with Your Documents")
 

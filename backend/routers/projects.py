@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
@@ -15,6 +16,7 @@ from ..schemas.planning import (
     ProjectSummary,
     ProjectUpdate,
 )
+from ..auto_indexer import get_auto_indexer
 from ..storage.conversation_store import ConversationStore
 from ..storage.plan_store import DevPlanStore
 from ..storage.project_store import ProjectStore
@@ -35,6 +37,10 @@ async def create_project(
         tags=payload.tags,
         repository_path=payload.repository_path,
     )
+    try:
+        await get_auto_indexer().on_project_created(project)
+    except Exception as exc:  # pragma: no cover - best effort indexing
+        logger.warning("Project indexing failed: %s", exc)
     return ProjectSummary.from_orm(project)
 
 
@@ -83,6 +89,10 @@ async def update_project(
         tags=payload.tags,
         repository_path=payload.repository_path,
     )
+    try:
+        await get_auto_indexer().on_project_updated(project)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Project re-index failed: %s", exc)
     return ProjectSummary.from_orm(project)
 
 
@@ -90,6 +100,10 @@ async def update_project(
 async def archive_project(project_id: str, session: AsyncSession = Depends(get_session)):
     store = ProjectStore(session)
     project = await store.archive_project(project_id)
+    try:
+        await get_auto_indexer().on_project_updated(project)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Project archive re-index failed: %s", exc)
     return ProjectSummary.from_orm(project)
 
 

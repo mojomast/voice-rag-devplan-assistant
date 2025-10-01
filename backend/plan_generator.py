@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from loguru import logger
 
 try:
+    from .auto_indexer import get_auto_indexer
     from .config import settings
     from .context_manager import PlanningContext
     from .models import DevPlan
     from .requesty_client import RequestyClient
     from .storage.plan_store import DevPlanStore
 except ImportError:  # pragma: no cover - enable direct imports in tests
+    from auto_indexer import get_auto_indexer
     from config import settings
     from context_manager import PlanningContext
     from models import DevPlan
@@ -43,16 +46,43 @@ class DevPlanGenerator:
         context: PlanningContext,
         plan_brief: Optional[str],
     ) -> DevPlan:
+        start_time = time.time()
+        
+        logger.info(
+            "Generating development plan",
+            extra={
+                "project_id": project_id,
+                "conversation_id": conversation_id,
+                "has_plan_brief": plan_brief is not None,
+            }
+        )
+        
+        # Build prompt
         messages = self._build_plan_prompt(context=context, plan_brief=plan_brief)
+        
+        # Call LLM with timing
+        llm_start = time.time()
         raw_response = await self.llm_client.achat_completion(
             messages,
             temperature=settings.PLANNING_TEMPERATURE,
             max_tokens=settings.PLANNING_MAX_TOKENS,
             model=settings.REQUESTY_PLANNING_MODEL,
         )
+        llm_time = time.time() - llm_start
+        
+        logger.debug(
+            "Plan generation LLM call completed",
+            extra={
+                "model": settings.REQUESTY_PLANNING_MODEL,
+                "response_time_seconds": llm_time,
+                "response_length": len(raw_response),
+            }
+        )
 
+        # Parse and persist
         draft = self._parse_plan_response(raw_response, plan_brief=plan_brief)
-
+        
+        persist_start = time.time()
         plan = await self.plan_store.create_plan(
             project_id=project_id,
             title=draft.title,
@@ -61,8 +91,26 @@ class DevPlanGenerator:
             metadata=draft.metadata,
             change_summary=draft.summary,
         )
+        persist_time = time.time() - persist_start
 
-        logger.info("Created development plan %s for project %s", plan.id, project_id)
+        try:
+            await get_auto_indexer().on_plan_created(plan, content=draft.content)
+        except Exception as exc:  # pragma: no cover - indexing is best-effort
+            logger.warning("Plan indexing failed: %s", exc)
+        
+        total_time = time.time() - start_time
+        logger.info(
+            "Development plan created successfully",
+            extra={
+                "plan_id": plan.id,
+                "project_id": project_id,
+                "plan_title": draft.title,
+                "content_length": len(draft.content),
+                "total_time_seconds": total_time,
+                "llm_time_seconds": llm_time,
+                "persist_time_seconds": persist_time,
+            }
+        )
         return plan
 
     def _build_plan_prompt(

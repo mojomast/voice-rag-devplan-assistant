@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -51,41 +52,105 @@ class PlanningAgent:
         session_id: str,
         project_id: Optional[str],
     ) -> AgentResult:
+        start_time = time.time()
+        
+        logger.info(
+            "Planning agent handling message",
+            extra={
+                "session_id": session_id,
+                "project_id": project_id,
+                "message_length": len(message),
+            }
+        )
+        
         conversation = await self.conversation_store.get_session(session_id, include_messages=True)
         if not conversation:
+            logger.error("Conversation session not found", extra={"session_id": session_id})
             raise ValueError(f"Conversation session {session_id} not found")
 
+        # Build context with timing
+        context_start = time.time()
         context = await self.context_manager.build_context(
             query=message,
             project_id=project_id,
             session_id=session_id,
         )
+        context_time = time.time() - context_start
+        logger.debug(f"Context building took {context_time:.3f}s")
 
+        # Build prompt and call LLM with timing
         prompt_messages = self._build_prompt_messages(conversation, message, context)
+        llm_start = time.time()
         raw_reply = await self.llm_client.achat_completion(
             prompt_messages,
             temperature=settings.PLANNING_TEMPERATURE,
             max_tokens=settings.PLANNING_MAX_TOKENS,
             model=settings.REQUESTY_PLANNING_MODEL,
         )
+        llm_time = time.time() - llm_start
+        logger.info(
+            "LLM agent response received",
+            extra={
+                "model": settings.REQUESTY_PLANNING_MODEL,
+                "response_time_seconds": llm_time,
+                "response_length": len(raw_reply),
+            }
+        )
 
+        # Parse response
         parsed = self._parse_agent_response(raw_reply)
         reply_text = parsed.get("assistant_reply") or raw_reply
         actions = parsed.get("actions", {})
+        
+        is_json = isinstance(parsed, dict) and "actions" in parsed
+        logger.debug(
+            "Agent response parsed",
+            extra={
+                "is_json": is_json,
+                "create_plan": actions.get("create_plan", False),
+            }
+        )
 
+        # Plan generation if requested
         plan = None
+        plan_gen_time = 0.0
         if actions.get("create_plan"):
             if not project_id:
-                logger.info("Plan creation requested but no project specified; skipping plan generation")
+                logger.warning(
+                    "Plan creation requested but no project specified",
+                    extra={"session_id": session_id}
+                )
                 actions["create_plan"] = False
                 actions["reason"] = "project_id_missing"
             else:
+                plan_start = time.time()
                 plan = await self.plan_generator.generate_plan(
                     project_id=project_id,
                     conversation_id=conversation.id,
                     context=context,
                     plan_brief=actions.get("plan_brief") or message,
                 )
+                plan_gen_time = time.time() - plan_start
+                logger.info(
+                    "Development plan generated",
+                    extra={
+                        "plan_id": plan.id,
+                        "plan_title": plan.title,
+                        "generation_time_seconds": plan_gen_time,
+                    }
+                )
+
+        total_time = time.time() - start_time
+        logger.info(
+            "Planning agent completed",
+            extra={
+                "total_time_seconds": total_time,
+                "context_time_seconds": context_time,
+                "llm_time_seconds": llm_time,
+                "plan_gen_time_seconds": plan_gen_time,
+                "plan_generated": plan is not None,
+            }
+        )
 
         return AgentResult(reply=reply_text, actions=actions, plan=plan, context=context)
 

@@ -1,5 +1,6 @@
 import os
-from typing import Dict, List, Optional, Any
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 from loguru import logger
 from pydantic import Field
 from langchain_community.vectorstores import FAISS
@@ -8,7 +9,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain_openai import OpenAIEmbeddings
 from langchain.prompts import PromptTemplate
 from langchain.llms.base import BaseLLM
-from langchain.schema import Document, LLMResult, Generation
+from langchain.schema import Document, Generation, LLMResult
 
 try:
     from langchain_community.embeddings import FakeEmbeddings
@@ -16,10 +17,14 @@ except ImportError:  # pragma: no cover - fake embeddings may be unavailable in 
     FakeEmbeddings = None
 
 try:
+    from .auto_indexer import get_auto_indexer
     from .config import settings
+    from .indexing.requesty_embeddings import RequestyEmbeddings
     from .requesty_client import RequestyClient
 except ImportError:  # pragma: no cover - support direct imports in tests
+    from auto_indexer import get_auto_indexer
     from config import settings
+    from indexing.requesty_embeddings import RequestyEmbeddings
     from requesty_client import RequestyClient
 
 class RequestyLLM(BaseLLM):
@@ -52,6 +57,10 @@ class RequestyLLM(BaseLLM):
 class RAGHandler:
     def __init__(self):
         self.test_mode = settings.TEST_MODE
+        self.plan_vector_store: Optional[FAISS] = None
+        self.plan_embeddings: Optional[Any] = None
+        self.project_vector_store: Optional[FAISS] = None
+        self.project_embeddings: Optional[Any] = None
 
         if self.test_mode:
             self._init_test_mode()
@@ -68,6 +77,10 @@ class RAGHandler:
                 self._init_test_mode()
 
         logger.info("RAG Handler initialized successfully")
+        try:
+            get_auto_indexer().register_rag_handler(self)
+        except Exception as exc:  # pragma: no cover - best effort
+            logger.debug("Failed to register RAG handler with auto indexer: %s", exc)
 
     def _init_test_mode(self):
         if FakeEmbeddings is None:
@@ -82,6 +95,8 @@ class RAGHandler:
         self.memory = None
         self.qa_chain = None
         self._conversation_history: List[Dict[str, Optional[str]]] = []
+        self.plan_vector_store = self.vector_store
+        self.project_vector_store = self.vector_store
 
     def _init_standard_mode(self):
         if not os.path.exists(settings.VECTOR_STORE_PATH) or not os.listdir(settings.VECTOR_STORE_PATH):
@@ -149,6 +164,9 @@ Detailed Answer (include specific details from the context):"""
             verbose=settings.DEBUG,
             combine_docs_chain_kwargs={"prompt": QA_PROMPT}
         )
+
+        self._load_plan_vector_store()
+        self._load_project_vector_store()
 
     def ask_question(self, query: str) -> Dict:
         """Asks a question to the RAG chain and returns the answer and sources."""
@@ -229,6 +247,51 @@ Detailed Answer (include specific details from the context):"""
                 "error": str(e)
             }
 
+    def search(
+        self,
+        query: str,
+        *,
+        k: int = 5,
+        metadata_filter: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Perform similarity search across available vector stores."""
+
+        metadata_filter = metadata_filter or {}
+
+        if self.test_mode:
+            return [
+                {
+                    "score": 0.0,
+                    "metadata": {"type": metadata_filter.get("type", "test"), "query": query},
+                    "content": f"Test mode result for '{query}'",
+                }
+            ]
+
+        target_type = metadata_filter.get("type")
+        store, description = self._resolve_store_for_search(target_type)
+        if store is None:
+            logger.debug("No vector store available for search type %s", target_type)
+            return []
+
+        results = []
+        try:
+            matches = store.similarity_search_with_score(query, k=k)
+            for document, score in matches:
+                metadata = getattr(document, "metadata", {}) or {}
+                if self._metadata_matches(metadata, metadata_filter):
+                    results.append(
+                        {
+                            "score": score,
+                            "metadata": metadata,
+                            "content": document.page_content,
+                            "source": metadata.get("source"),
+                            "index": description,
+                        }
+                    )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning("Vector search failed (%s): %s", description, exc)
+        return results
+
     def clear_memory(self):
         """Clear the conversation memory"""
         if self.test_mode:
@@ -303,6 +366,14 @@ Detailed Answer (include specific details from the context):"""
             logger.error(f"Error reloading vector store: {e}")
             return {"status": "error", "error": str(e)}
 
+    def reload_plan_vector_store(self) -> None:
+        """Reload the devplan index from disk."""
+        self._load_plan_vector_store(force_reload=True)
+
+    def reload_project_vector_store(self) -> None:
+        """Reload the project/conversation index from disk."""
+        self._load_project_vector_store(force_reload=True)
+
     def _generate_test_documents(self) -> List[Document]:
         """Create a small test corpus for TEST_MODE vector store operations."""
         base_docs = [
@@ -355,3 +426,64 @@ Detailed Answer (include specific details from the context):"""
         except Exception as exc:
             logger.warning(f"Failed to create TEST_MODE vector store: {exc}")
             return None
+
+    def _resolve_store_for_search(self, target_type: Optional[str]) -> tuple[Optional[FAISS], str]:
+        if target_type == "devplan":
+            return self.plan_vector_store, "devplan_index"
+        if target_type in {"project", "conversation"}:
+            return self.project_vector_store, "project_index"
+        return self.vector_store, "document_index"
+
+    def _metadata_matches(self, metadata: Dict[str, Any], filters: Dict[str, Any]) -> bool:
+        for key, value in filters.items():
+            if value is None:
+                continue
+            if metadata.get(key) != value:
+                return False
+        return True
+
+    def _load_plan_vector_store(self, force_reload: bool = False) -> None:
+        if not force_reload and self.plan_vector_store is not None:
+            return
+
+        index_path = Path(settings.DEVPLAN_VECTOR_STORE_PATH)
+        index_file = index_path / "index.faiss"
+        if not index_file.exists():
+            self.plan_vector_store = None
+            return
+
+        try:
+            embeddings = RequestyEmbeddings(RequestyClient())
+            self.plan_vector_store = FAISS.load_local(
+                str(index_path),
+                embeddings,
+                allow_dangerous_deserialization=True,
+            )
+            self.plan_embeddings = embeddings
+            logger.info("Loaded devplan vector store from %s", index_path)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("Failed to load devplan vector store: %s", exc)
+            self.plan_vector_store = None
+
+    def _load_project_vector_store(self, force_reload: bool = False) -> None:
+        if not force_reload and self.project_vector_store is not None:
+            return
+
+        index_path = Path(settings.PROJECT_VECTOR_STORE_PATH)
+        index_file = index_path / "index.faiss"
+        if not index_file.exists():
+            self.project_vector_store = None
+            return
+
+        try:
+            embeddings = RequestyEmbeddings(RequestyClient())
+            self.project_vector_store = FAISS.load_local(
+                str(index_path),
+                embeddings,
+                allow_dangerous_deserialization=True,
+            )
+            self.project_embeddings = embeddings
+            logger.info("Loaded project vector store from %s", index_path)
+        except Exception as exc:  # pragma: no cover
+            logger.warning("Failed to load project vector store: %s", exc)
+            self.project_vector_store = None

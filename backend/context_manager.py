@@ -10,10 +10,12 @@ try:
     from .storage.conversation_store import ConversationStore
     from .storage.plan_store import DevPlanStore
     from .storage.project_store import ProjectStore
+    from .project_memory import ProjectMemorySystem
 except ImportError:  # pragma: no cover - allow direct module execution in tests
     from storage.conversation_store import ConversationStore
     from storage.plan_store import DevPlanStore
     from storage.project_store import ProjectStore
+    from project_memory import ProjectMemorySystem
 
 if TYPE_CHECKING:  # pragma: no cover
     try:
@@ -32,6 +34,7 @@ class PlanningContext:
     rag_sources: List[Dict[str, Any]] = field(default_factory=list)
     rag_answer: Optional[str] = None
     suggestions: List[str] = field(default_factory=list)
+    project_memory: Optional[Dict[str, Any]] = None
 
     def as_prompt_section(self) -> str:
         project_section = "None" if not self.project else json_like(self.project)
@@ -43,6 +46,7 @@ class PlanningContext:
         suggestions_section = "\n".join(self.suggestions) or "None"
 
         rag_summary = self.rag_answer or "None"
+        memory_section = self._memory_section()
 
         return (
             f"Project Summary:\n{project_section}\n\n"
@@ -50,8 +54,43 @@ class PlanningContext:
             f"Conversation Snippet:\n{messages_section}\n\n"
             f"RAG Summary:\n{rag_summary}\n\n"
             f"RAG Sources:\n{sources_section}\n\n"
-            f"Agent Suggestions:\n{suggestions_section}"
+            f"Agent Suggestions:\n{suggestions_section}\n\n"
+            f"Project Memory:\n{memory_section}"
         )
+
+    def _memory_section(self) -> str:
+        if not self.project_memory:
+            return "None"
+
+        lines: List[str] = []
+        key_decisions = self.project_memory.get("key_decisions") or []
+        if key_decisions:
+            lines.append("Key decisions: " + "; ".join(str(item) for item in key_decisions[:5]))
+
+        lessons = self.project_memory.get("lessons_learned") or []
+        if lessons:
+            lines.append("Lessons learned: " + "; ".join(str(item) for item in lessons[:3]))
+
+        similar = self.project_memory.get("similar_projects") or []
+        if similar:
+            highlights = []
+            for item in similar[:3]:
+                metadata = item.get("metadata", {}) if isinstance(item, dict) else {}
+                name = metadata.get("name") or metadata.get("project_id") or item.get("content")
+                if name:
+                    highlights.append(str(name))
+            if highlights:
+                lines.append("Similar projects: " + ", ".join(highlights))
+
+        conversation_summary = self.project_memory.get("conversation_summary") or []
+        if conversation_summary and isinstance(conversation_summary, list):
+            summaries = [entry.get("summary") for entry in conversation_summary if entry.get("summary")]
+            if summaries:
+                lines.append("Recent conversation summaries: " + "; ".join(summaries[:2]))
+
+        if not lines:
+            return json_like(self.project_memory)
+        return "\n".join(lines)
 
 
 def json_like(payload: Dict[str, Any]) -> str:
@@ -73,6 +112,16 @@ class PlanningContextManager:
         self.plan_store = plan_store
         self.conversation_store = conversation_store
         self.rag_handler = rag_handler
+        self.project_memory = (
+            ProjectMemorySystem(
+                project_store=project_store,
+                plan_store=plan_store,
+                conversation_store=conversation_store,
+                rag_handler=rag_handler,
+            )
+            if rag_handler
+            else None
+        )
 
     async def build_context(
         self,
@@ -141,6 +190,7 @@ class PlanningContextManager:
         rag_answer = None
         rag_sources: List[Dict[str, Any]] = []
         suggestions: List[str] = []
+        project_memory_blob: Optional[Dict[str, Any]] = None
 
         if self.rag_handler:
             loop = asyncio.get_running_loop()
@@ -153,12 +203,27 @@ class PlanningContextManager:
             except Exception as exc:  # pragma: no cover - defensive logging
                 logger.debug(f"RAG lookup failed: {exc}")
 
+            if project_id and self.project_memory:
+                try:
+                    project_memory_blob = await self.project_memory.get_project_context(project_id)
+                except Exception as exc:  # pragma: no cover
+                    logger.debug(f"Project memory lookup failed: {exc}")
+
         if rag_answer:
             suggestions.append(rag_answer)
         if project_summary and project_summary.get("tags"):
             suggestions.append(
                 "Existing project tags: " + ", ".join(project_summary["tags"])
             )
+        if project_memory_blob:
+            for decision in project_memory_blob.get("key_decisions", [])[:3]:
+                suggestions.append(f"Past decision: {decision}")
+            similar = project_memory_blob.get("similar_projects", [])
+            for item in similar[:2]:
+                metadata = item.get("metadata", {}) if isinstance(item, dict) else {}
+                name = metadata.get("name") or metadata.get("project_id")
+                if name:
+                    suggestions.append(f"Similar project to review: {name}")
 
         return PlanningContext(
             project=project_summary,
@@ -167,4 +232,5 @@ class PlanningContextManager:
             rag_sources=rag_sources,
             rag_answer=rag_answer,
             suggestions=suggestions,
+            project_memory=project_memory_blob,
         )

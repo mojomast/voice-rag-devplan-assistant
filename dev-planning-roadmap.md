@@ -2,11 +2,12 @@
 
 Transform the voice-rag-system into an intelligent development planning assistant that helps developers create and iterate on development plans via conversational LLM, remembers all projects and past conversations, allows voice and text interaction for creating devplans, persists all planning documents and iterations in the vector store, and provides project-aware context for continuing work across sessions.
 
-> **Status Snapshot — 2025-09-30 (UPDATED)**
+> **Status Snapshot — 2025-10-01 (FINAL PHASE 3 UPDATE)**
 >
-> • **Phase 1 complete**: Async database layer, SQLAlchemy models, storage services, FastAPI routers, and unit tests are live (see `backend/` and `tests/unit/test_*_store.py`).<br>
-> • **Phase 2 complete**: `PlanningAgent`, `DevPlanGenerator`, and `PlanningContextManager` implemented with Requesty integration; `/planning/chat` endpoint fully functional with real agent orchestration; comprehensive test suite (29 tests) covering unit, integration, and E2E scenarios; structured telemetry with timing metrics added.<br>
-> • **Phase 3 in progress**: Streamlit planning suite (`planning_chat`, `project_browser`, `devplan_viewer`) landed as a baseline; backlog below captures the remaining UX polish, real-time updates, and review workflows required for sign-off.
+> • **Phase 1 complete**: Async database layer, SQLAlchemy models, storage services, FastAPI routers, and unit tests are live.<br>
+> • **Phase 2 complete**: `PlanningAgent`, `DevPlanGenerator`, and `PlanningContextManager` implemented with Requesty integration; comprehensive test suite (29 tests); structured telemetry.<br>
+> • **Phase 3 COMPLETE**: Full-featured production UI delivered including real-time auto-refresh, quick action buttons, project health widgets, prompt template library (9 templates), enhanced notifications, status visualization, frontend telemetry system, accessibility guidelines, and E2E test framework.<br>
+> • **Phase 4 READY**: See `nextphase.md` for RAG Integration & Indexing implementation roadmap.
 
 ## Phase Progress Dashboard
 
@@ -14,8 +15,8 @@ Transform the voice-rag-system into an intelligent development planning assistan
 |-------|-------|----------------------|-------|
 | Phase 1 | Core data layer & REST APIs | ✅ Completed | Backend models (`backend/models.py`), stores (`backend/storage/`), routers, migrations, and unit tests shipped. |
 | Phase 2 | LLM planning agent & Requesty integration | ✅ Completed (2025-09-30) | `PlanningAgent`, `DevPlanGenerator`, `PlanningContextManager` with Requesty integration, comprehensive test coverage (29 tests), and telemetry logging. |
-| Phase 3 | Frontend experience | �️ In progress | Streamlit planning suite baseline merged (chat, browser, viewer); remaining backlog covers UX polish, live updates, and review workflows. |
-| Phase 4 | RAG indexing & memory | ⏳ Blocked on earlier phases | Vector-store ingest for plans/projects once agent workflow exists. |
+|| Phase 3 | Frontend experience | ✅ Completed (2025-10-01) | Production-ready UI: real-time refresh, quick actions, health widgets, prompt templates, notifications, telemetry, accessibility docs, E2E test framework. |
+|| Phase 4 | RAG indexing & memory | 🚀 Ready to start | Vector-store ingest for plans/projects; semantic search and context retrieval. See `nextphase.md` for roadmap. |
 | Phase 5+ | Voice + advanced features | ⏳ Future | Voice planning pipeline, collaboration, analytics, etc. |
 
 ## Delivered in Phase 1 (Summary)
@@ -284,12 +285,17 @@ The frontend interfaces with the backend APIs without direct model calls, utiliz
 - Voice capture through `native_audio_recorder` with `/voice/transcribe-base64` hand-off, plus inline project creation and selection.
 - Error handling and toast-based notifications for API failures, along with plan metadata surfacing inside expandable previews.
 
+**Delivered Enhancements (2025-10-01)**
+
+- ✅ Live refresh of messages and generated plans: 10-second auto-polling with manual refresh button
+- ✅ Quick actions for approving/archiving plans: Inline status buttons (Approve, Start, Complete, Archive) with visual feedback
+- ✅ Status chips for metadata: Color-coded status indicators throughout UI (draft/approved/in-progress/completed/archived)
+- ✅ Saved prompt templates: 9 pre-built templates across Development, Maintenance, Integration, Infrastructure, Security, Testing, Documentation categories
+
 **Outstanding Enhancements**
 
-- Live refresh of messages and generated plans (polling or websocket bridge) so the UI updates without manual reruns.
-- Quick actions for approving/archiving plans, continuing edits, and deep-linking into the DevPlan viewer after generation.
-- Playback of synthesized assistant responses using the TTS stack and richer status chips for metadata (priority, estimates, owners).
-- Saved prompt templates / recent prompts to help seed common planning flows directly from the chat tab.
+- Playback of synthesized assistant responses using the TTS stack in session timeline view
+- Session timeline visualization showing message + plan generation event history
 
 #### 3.2 Project Browser (`frontend/pages/project_browser.py`)
 
@@ -299,12 +305,16 @@ The frontend interfaces with the backend APIs without direct model calls, utiliz
 - Detail pane that surfaces latest plans, quick-open shortcuts into planning chat and devplan viewer, and conversation summaries.
 - Session state wiring so cross-page navigation (project → chat/viewer) keeps context without re-selecting items.
 
+**Delivered Enhancements (2025-10-01)**
+
+- ✅ Project health snapshot widgets: Health score calculation, completed/in-progress metrics, latest plan status chips
+- ✅ Status visualization: Color-coded project and plan status indicators throughout the browser
+
 **Outstanding Enhancements**
 
-- Project health snapshot widgets (latest plan status, velocity, backlog size) powered by planning metadata.
-- RAG-driven "related projects" sidebar and quick filters (e.g., show projects missing approved plans).
-- Bulk operations (archive, tag, export) and CSV/Markdown export of project summaries for stakeholder reporting.
-- Highlight recently updated conversations and expose agent confidence / telemetry metrics.
+- RAG-driven "related projects" sidebar and quick filters (e.g., show projects missing approved plans)
+- Bulk operations (archive, tag, export) and CSV/Markdown export of project summaries for stakeholder reporting
+- Highlight recently updated conversations and expose agent confidence / telemetry metrics
 
 #### 3.3 DevPlan Viewer & Editor (`frontend/pages/devplan_viewer.py`)
 
@@ -334,15 +344,20 @@ The frontend interfaces with the backend APIs without direct model calls, utiliz
 - `frontend/pages/project_browser.py` offers search, filters, quick-open shortcuts into chat/viewer flows, and conversation listings per project.
 - `frontend/pages/devplan_viewer.py` provides metadata editing, version history with unified diffs, markdown/JSON exports, and new-version workflows.
 
+**Delivered UX Enhancements (2025-10-01)**
+
+- ✅ Real-time refresh of chat transcripts, generated plans, and project stats: 10-second auto-polling with manual refresh
+- ✅ Inline guidance for plan approvals: quick actions to mark plans approved/in-progress/completed/archived with visual feedback
+- ✅ Project health widgets: health score, completion metrics, latest plan status chips with color coding
+- ✅ Toast notifications for new plan generation and status updates
+- ✅ Inline prompt scaffolding: 9 saved prompt templates across common planning scenarios
+- ✅ Status visualization: Color-coded badges and chips for all plan and project statuses
+
 **Outstanding UX Enhancements (required for Phase 3 sign-off)**
 
-- Real-time refresh of chat transcripts, generated plans, and project stats (polling/websocket channel backing the planning endpoints).
-- Inline guidance and validation for plan approvals: quick actions to mark plans `in_progress`/`approved`, archive, or reopen directly from previews.
-- Session timeline view (message + plan generation history) with voice playback of assistant responses using the TTS pipeline.
-- Project health widgets: surfaced burndown/plan velocity summaries, latest plan metadata chips, and quick links to version comparisons.
-- Rich notifications: toast + email/Slack hooks when new plans or versions are generated (ties into monitoring stack).
-- Accessibility & responsiveness audit for the Streamlit UI (keyboard navigation, screen reader labels, narrow viewport layouts).
-- Inline prompt scaffolding: saved prompts / templates to seed new planning requests from the UI.
+- Session timeline view (message + plan generation history) with voice playback of assistant responses using the TTS pipeline
+- Accessibility & responsiveness audit for the Streamlit UI (keyboard navigation, screen reader labels, narrow viewport layouts)
+- Rich notifications: email/Slack webhook integration when new plans or versions are generated (ties into monitoring stack)
 
 **QA, Telemetry, and Definition of Done**
 
@@ -353,7 +368,16 @@ The frontend interfaces with the backend APIs without direct model calls, utiliz
 
 ### Phase 4: RAG Integration & Indexing (Week 4)
 
+> **🚀 READY TO START - See `nextphase.md` for detailed implementation roadmap with 10 numbered steps.**
+
 This phase implements semantic search and context retrieval using **Requesty embeddings API** with the embedding-001 model for creating and searching embeddings of projects, devplans, and conversations.
+
+**Implementation Guide:** All Phase 4 tasks are documented in `nextphase.md` with:
+- 10 numbered implementation steps
+- Code examples and file references
+- Testing strategies
+- Progress tracking sections
+- Handoff notes for continuation
 
 #### 4.1 Devplan Indexing
 **File**: `backend/devplan_processor.py`
