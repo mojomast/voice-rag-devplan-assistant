@@ -1,0 +1,34 @@
+{
+  "timestamp": "2025-10-01 12:06:00",
+  "tests": {
+    "backend_health": {
+      "status_code": 200,
+      "success": true
+    },
+    "search_plans": {
+      "status_code": 200,
+      "latency_ms": 2019.2832946777344,
+      "success": true
+    },
+    "search_projects": {
+      "status_code": 200,
+      "latency_ms": 2017.026424407959,
+      "success": true
+    },
+    "related_plans": {
+      "status_code": 404,
+      "latency_ms": 2044.3377494812012,
+      "success": false
+    },
+    "similar_projects": {
+      "status_code": 404,
+      "latency_ms": 2030.3938388824463,
+      "success": false
+    },
+    "performance": {
+      "average_latency_ms": 2011.905288696289,
+      "target_met": false
+    }
+  },
+  "overall_success": false
+}

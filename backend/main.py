@@ -36,6 +36,7 @@ try:
     from .routers import planning_chat as planning_router
     from .routers import templates as templates_router
     from .routers import search as search_router
+    from .routers import voice as voice_router
 except ImportError:  # pragma: no cover - enables direct module imports in tests
     from config import settings
     from document_processor import DocumentProcessor
@@ -61,6 +62,7 @@ except ImportError:  # pragma: no cover - enables direct module imports in tests
     from routers import planning_chat as planning_router
     from routers import templates as templates_router
     from routers import search as search_router
+    from routers import voice as voice_router
 
 # Configure logging
 logger.add("logs/app.log", rotation="1 day", retention="7 days", level=settings.LOG_LEVEL)
@@ -77,6 +79,7 @@ app.include_router(devplans_router.router)
 app.include_router(planning_router.router)
 app.include_router(templates_router.router)
 app.include_router(search_router.router)
+app.include_router(voice_router.router)
 
 # Add CORS middleware
 app.add_middleware(

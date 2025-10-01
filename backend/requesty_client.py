@@ -50,13 +50,14 @@ class RequestyClient:
 
         if self.router_api_key:
             try:
+                # Remove manual authorization headers to prevent double auth issue
+                # The OpenAI SDK automatically adds the Authorization header when api_key is provided
                 self.router_client = OpenAI(
                     api_key=self.router_api_key,
                     base_url="https://router.requesty.ai/v1",
-                    default_headers={"Authorization": f"Bearer {self.router_api_key}"},
                 )
                 self.use_router = True
-                logger.info("Requesty Router client initialised")
+                logger.info("Requesty Router client initialised successfully")
             except Exception as exc:  # pragma: no cover - defensive guard
                 logger.warning(f"Failed to initialise Requesty Router client: {exc}")
                 self.use_router = False
@@ -103,6 +104,7 @@ class RequestyClient:
 
     def _router_chat_completion(self, messages: List[Dict[str, str]], model: str, **kwargs) -> str:
         router_model = self._qualify_model(model)
+        logger.debug("Requesty Router chat completion - model: %s -> %s", model, router_model)
 
         try:
             response = self.router_client.chat.completions.create(  # type: ignore[union-attr]
@@ -122,11 +124,19 @@ class RequestyClient:
                 )
             return content
         except Exception as exc:
-            logger.warning(
-                "Requesty Router request failed for model {}: {}",
+            logger.error(
+                "Requesty Router request failed for model %s (original: %s): %s",
                 router_model,
+                model,
                 exc,
             )
+            # Check for specific authorization errors
+            if "401" in str(exc) or "unauthorized" in str(exc).lower():
+                logger.error("Authorization failed - check ROUTER_API_KEY configuration")
+            elif "429" in str(exc) or "rate limit" in str(exc).lower():
+                logger.error("Rate limit exceeded - please wait before retrying")
+            elif "model" in str(exc).lower():
+                logger.error("Model error - check if model %s is available", router_model)
             return self._fallback_completion(messages, model, **kwargs)
 
     def _openai_chat_completion(self, messages: List[Dict[str, str]], model: str, **kwargs) -> str:
@@ -134,6 +144,7 @@ class RequestyClient:
             raise RuntimeError("OpenAI API key not configured for fallback usage")
 
         try:
+            logger.debug("OpenAI chat completion - model: %s", model)
             response = self.openai_client.chat.completions.create(  # type: ignore[union-attr]
                 model=model,
                 messages=messages,
@@ -150,10 +161,13 @@ class RequestyClient:
                 )
             return content
         except Exception as exc:
-            logger.warning(
-                "OpenAI fallback request failed: {}. Disabling OpenAI client and returning deterministic response",
+            logger.error(
+                "OpenAI fallback request failed: %s. Disabling OpenAI client and returning deterministic response",
                 exc,
             )
+            # Check for specific authorization errors
+            if "401" in str(exc) or "unauthorized" in str(exc).lower():
+                logger.error("OpenAI authorization failed - check OPENAI_API_KEY configuration")
             self.openai_client = None
             return self._fallback_completion(messages, model, **kwargs)
 
@@ -169,11 +183,13 @@ class RequestyClient:
         try:
             if self.use_router and self.router_client:
                 router_model = self._qualify_model(target_model)
+                logger.debug("Requesty Router embeddings - model: %s -> %s", target_model, router_model)
                 response = self.router_client.embeddings.create(  # type: ignore[union-attr]
                     model=router_model,
                     input=texts,
                 )
             elif self.openai_client:
+                logger.debug("OpenAI embeddings - model: %s", target_model)
                 response = self.openai_client.embeddings.create(  # type: ignore[union-attr]
                     model=target_model,
                     input=texts,
@@ -183,7 +199,16 @@ class RequestyClient:
 
             return [item.embedding for item in response.data]
         except Exception as exc:
-            logger.warning(f"Embedding request failed ({exc}); using deterministic embeddings")
+            logger.error(
+                "Embedding request failed for model %s: %s. Using deterministic embeddings",
+                target_model,
+                exc,
+            )
+            # Check for specific authorization errors
+            if "401" in str(exc) or "unauthorized" in str(exc).lower():
+                logger.error("Embedding authorization failed - check API key configuration")
+            elif "model" in str(exc).lower():
+                logger.error("Embedding model error - check if model %s is available", target_model)
             return [self._deterministic_embedding(text) for text in texts]
 
     async def aembed_texts(self, texts: List[str], model: Optional[str] = None) -> List[List[float]]:
@@ -195,17 +220,42 @@ class RequestyClient:
     # Metadata & fallbacks
     # ------------------------------------------------------------------
     def get_usage_stats(self) -> Dict[str, Any]:
+        """Get usage statistics from Requesty Router API."""
         if not self.use_router:
+            logger.warning("Usage stats requested but Requesty Router not configured")
             return {"error": "Requesty Router not configured"}
 
         try:
-            headers = {"Authorization": f"Bearer {self.router_api_key}"}
-            response = requests.get("https://router.requesty.ai/v1/usage", headers=headers, timeout=30)
+            logger.debug("Fetching usage stats from Requesty Router")
+            # Use the same authentication pattern as the OpenAI client
+            # The requests library will handle the Authorization header properly
+            response = requests.get(
+                "https://router.requesty.ai/v1/usage",
+                headers={"Authorization": f"Bearer {self.router_api_key}"},
+                timeout=30,
+            )
             if response.status_code == 200:
-                return response.json()
-            return {"error": f"API request failed: {response.status_code}"}
+                stats = response.json()
+                logger.info("Successfully retrieved usage stats from Requesty Router")
+                return stats
+            elif response.status_code == 401:
+                logger.error("Failed to retrieve usage stats - authorization error")
+                return {"error": "Authorization failed - check ROUTER_API_KEY"}
+            elif response.status_code == 403:
+                logger.error("Failed to retrieve usage stats - access forbidden")
+                return {"error": "Access forbidden - insufficient permissions"}
+            else:
+                logger.error("Failed to retrieve usage stats - HTTP %s: %s", response.status_code, response.text)
+                return {"error": f"API request failed: {response.status_code} - {response.text}"}
+        except requests.exceptions.Timeout:
+            logger.error("Usage stats request timed out")
+            return {"error": "Request timed out"}
+        except requests.exceptions.ConnectionError:
+            logger.error("Failed to connect to Requesty Router for usage stats")
+            return {"error": "Connection failed"}
         except Exception as exc:  # pragma: no cover - best effort logging
-            return {"error": str(exc)}
+            logger.error("Unexpected error retrieving usage stats: %s", exc)
+            return {"error": f"Unexpected error: {str(exc)}"}
 
     def _fallback_completion(self, messages: List[Dict[str, str]], model: str, **kwargs) -> str:
         if self.openai_client:
@@ -233,11 +283,24 @@ class RequestyClient:
 
     @staticmethod
     def _qualify_model(model: str) -> str:
+        """Qualify model name with appropriate provider prefix for Requesty Router."""
         if "/" in model:
+            # Model already has a provider prefix
             return model
-        if model.startswith("glm") or model.startswith("embedding"):
-            return f"requesty/{model}"
-        return f"openai/{model}"
+        
+        # Convert to lowercase for consistent matching
+        model_lower = model.lower()
+        
+        # Requesty models that need requesty/ prefix
+        if model_lower.startswith("glm") or model_lower.startswith("embedding"):
+            qualified = f"requesty/{model}"
+            logger.debug("Qualified model: %s -> %s", model, qualified)
+            return qualified
+        
+        # Default to OpenAI provider
+        qualified = f"openai/{model}"
+        logger.debug("Qualified model: %s -> %s", model, qualified)
+        return qualified
 
     @staticmethod
     def _looks_like_openai_key(value: str) -> bool:

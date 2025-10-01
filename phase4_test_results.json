@@ -1,0 +1,90 @@
+{
+  "timestamp": "2025-10-01 12:03:45",
+  "tests": {
+    "backend_health": {
+      "status_code": 200,
+      "data": {
+        "status": "healthy",
+        "vector_store_exists": true,
+        "document_count": 7,
+        "requesty_enabled": false,
+        "wake_word_enabled": false,
+        "test_mode": true
+      },
+      "success": true
+    },
+    "search_plans": {
+      "status_code": 200,
+      "latency_ms": 2020.5223560333252,
+      "data": {
+        "results": [
+          {
+            "id": "unknown",
+            "title": "Untitled Plan",
+            "type": "devplan",
+            "content_preview": "Test mode result for 'authentication'",
+            "score": 0.0,
+            "metadata": {
+              "project_id": null,
+              "status": null,
+              "section_title": null,
+              "version": null,
+              "updated_at": null
+            }
+          }
+        ],
+        "query": "authentication",
+        "total_found": 1
+      },
+      "success": true
+    },
+    "search_projects": {
+      "status_code": 200,
+      "latency_ms": 2018.3117389678955,
+      "data": {
+        "results": [
+          {
+            "id": "unknown",
+            "title": "Untitled Project",
+            "type": "project",
+            "content_preview": "Test mode result for 'development'",
+            "score": 0.0,
+            "metadata": {
+              "status": null,
+              "tags": [],
+              "plan_count": 0,
+              "conversation_count": 0,
+              "updated_at": null
+            }
+          }
+        ],
+        "query": "development",
+        "total_found": 1
+      },
+      "success": true
+    },
+    "performance": {
+      "average_latency_ms": 2013.1843090057373,
+      "individual_timings": [
+        2017.2793865203857,
+        2016.6428089141846,
+        2005.6307315826416
+      ],
+      "target_met": false
+    },
+    "vector_stores": {
+      "exists": true,
+      "file_count": 4,
+      "files": [
+        "devplans",
+        "index.faiss",
+        "index.pkl",
+        "projects"
+      ]
+    },
+    "database": {
+      "exists": true
+    }
+  },
+  "overall_success": false
+}

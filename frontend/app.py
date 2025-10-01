@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 import tempfile
 import time
+import base64
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -329,47 +330,134 @@ with tab_text:
         st.rerun()
 
 with tab_voice:
-    st.info("🎙️ Voice input feature")
-    st.markdown("Upload an audio file to ask a question:")
+    st.info("🎙️ Enhanced Voice Interface")
+    st.markdown("Choose your preferred voice input method:")
+    
+    # Create sub-tabs for different voice input methods
+    subtab_recorder, subtab_upload, subtab_interface = st.tabs(["🎤 Native Recorder", "📁 File Upload", "🚀 Full Interface"])
+    
+    with subtab_recorder:
+        # Native audio recorder
+        try:
+            from components.native_audio_recorder import native_audio_recorder, get_recorded_audio_as_bytes
+            
+            st.markdown("**Record your query directly:**")
+            
+            # Get voice settings if available
+            voice_settings = st.session_state.get("voice_settings", {})
+            theme = voice_settings.get("theme", "light")
+            
+            # Apply theme settings
+            recording_color = "#dc3545" if theme == "light" else "#ff6b6b"
+            background_color = "#f8f9fa" if theme == "light" else "#2d3748"
+            
+            audio_data = native_audio_recorder(
+                height=300,
+                recording_color=recording_color,
+                background_color=background_color
+            )
+            
+            if audio_data:
+                st.success("✅ Audio recorded successfully!")
+                
+                # Show recording info
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Duration", audio_data.get('duration', 'Unknown'))
+                with col2:
+                    size_kb = audio_data.get('size', 0) / 1024
+                    st.metric("Size", f"{size_kb:.1f} KB")
+                with col3:
+                    st.metric("Format", audio_data.get('mime_type', 'Unknown'))
+                
+                # Process buttons
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if st.button("🎯 Transcribe & Query", type="primary", key="process_recorded"):
+                        _process_recorded_audio(audio_data, API_URL)
+                
+                with col2:
+                    if st.button("🔊 Just Transcribe", key="transcribe_only"):
+                        _transcribe_audio_only(audio_data, API_URL)
+                        
+        except ImportError:
+            st.error("❌ Native audio recorder not available. Please install the required components.")
+    
+    with subtab_upload:
+        # Traditional file upload
+        st.markdown("**Upload an audio file:**")
+        
+        audio_file = st.file_uploader(
+            "Choose audio file",
+            type=["wav", "mp3", "m4a", "ogg", "webm"],
+            help="Supported formats: WAV, MP3, M4A, OGG, WebM"
+        )
 
-    audio_file = st.file_uploader(
-        "Upload audio file",
-        type=["wav", "mp3", "m4a", "ogg"],
-        help="Record your question and upload the audio file"
-    )
+        if audio_file:
+            # Show file info
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("File Name", audio_file.name[:20] + "..." if len(audio_file.name) > 20 else audio_file.name)
+            with col2:
+                size_mb = audio_file.size / (1024 * 1024)
+                st.metric("Size", f"{size_mb:.2f} MB")
+            with col3:
+                st.metric("Type", audio_file.type)
+            
+            col1, col2 = st.columns(2)
 
-    col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🎯 Process Voice Query", type="primary", key="process_uploaded"):
+                    _process_uploaded_file(audio_file, API_URL)
 
-    with col1:
-        if st.button("🎯 Process Voice Query", disabled=not audio_file):
-            if audio_file:
-                with st.spinner("Processing voice query..."):
-                    files = {"file": (audio_file.name, audio_file.getvalue(), audio_file.type)}
-                    response, error = make_api_request("/query/voice", "POST", files=files)
-
-                    if error:
-                        st.error(f"Connection error: {error}")
-                    elif response and response.status_code == 200:
-                        # Get the query text from headers
-                        query_text = response.headers.get("X-Query-Text", "Voice query")
-                        response_text = response.headers.get("X-Response-Text", "Voice response")
-
-                        # Add to chat history
-                        st.session_state.chat_history.append({"role": "user", "content": f"🎙️ {query_text}"})
-                        st.session_state.chat_history.append({"role": "assistant", "content": response_text})
-
-                        # Play the response audio
-                        st.audio(response.content, format="audio/mp3")
-                        st.success("Voice query processed successfully!")
-
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error(f"Error processing voice query: {response.status_code}")
-
-    with col2:
-        # Voice settings
-        st.selectbox("Voice", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
+            with col2:
+                if st.button("🔊 Just Transcribe", key="transcribe_uploaded"):
+                    _transcribe_uploaded_file(audio_file, API_URL)
+    
+    with subtab_interface:
+        # Link to full voice interface
+        st.markdown("**Advanced Voice Interface:**")
+        st.info("🚀 For the complete voice experience with enhanced features, use our dedicated voice interface.")
+        
+        if st.button("🎤 Open Full Voice Interface", type="primary"):
+            # This would typically navigate to the voice interface page
+            st.markdown("""
+            <div style="padding: 20px; background-color: #e3f2fd; border-radius: 10px; text-align: center;">
+                <h3>🎤 Full Voice Interface</h3>
+                <p>Navigate to the Voice Interface page for:</p>
+                <ul style="text-align: left; max-width: 400px; margin: 0 auto;">
+                    <li>🎙️ Advanced audio recording with waveform</li>
+                    <li>🔊 Enhanced voice playback with controls</li>
+                    <li>⚙️ Comprehensive voice settings</li>
+                    <li>📚 Session history and management</li>
+                    <li>🌍 Multi-language support</li>
+                    <li>🎨 Customizable themes and layouts</li>
+                </ul>
+                <p><strong>Access via: Pages → Voice Interface</strong></p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Voice settings panel (collapsed by default)
+    with st.expander("⚙️ Voice Settings", expanded=False):
+        try:
+            from components.voice_settings_panel import render_voice_settings_panel
+            
+            voice_settings = render_voice_settings_panel(API_URL)
+            
+            # Store voice settings in session state
+            if voice_settings:
+                st.session_state["voice_settings"] = voice_settings
+                
+        except ImportError:
+            # Fallback to basic voice selection
+            st.markdown("**Basic Voice Selection:**")
+            selected_voice = st.selectbox("Voice", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
+            st.session_state["basic_voice"] = selected_voice
+        except Exception as e:
+            st.warning(f"Voice settings unavailable: {str(e)}")
+            selected_voice = st.selectbox("Voice", ["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
+            st.session_state["basic_voice"] = selected_voice
 
 # Process text input if it exists
 if 'chat_history' in st.session_state and st.session_state.chat_history:
@@ -447,5 +535,208 @@ if __name__ == "__main__":
         import subprocess
         subprocess.run([sys.executable, "-m", "streamlit", "run", __file__])
         sys.exit(0)
+# Helper functions for voice processing
+def _process_recorded_audio(audio_data: Dict[str, Any], api_url: str):
+    """Process recorded audio through the complete pipeline"""
+    
+    with st.spinner("🎯 Processing voice query..."):
+        try:
+            # Get voice settings
+            voice_settings = st.session_state.get("voice_settings", {})
+            language = voice_settings.get("stt_language", "auto")
+            voice = voice_settings.get("tts_voice", "alloy")
+            
+            # Step 1: Transcribe audio
+            transcribe_payload = {
+                "audio_base64": audio_data['audio_data'],
+                "mime_type": audio_data.get('mime_type', 'audio/webm')
+            }
+            
+            if language != "auto":
+                transcribe_payload["language"] = language
+            
+            transcribe_response, error = make_api_request("/voice/transcribe-base64", "POST", json=transcribe_payload)
+            
+            if error or not transcribe_response or transcribe_response.status_code != 200:
+                st.error(f"❌ Transcription failed: {error or 'Unknown error'}")
+                return
+            
+            transcribe_result = transcribe_response.json()
+            query_text = transcribe_result.get('text', '')
+            
+            if not query_text.strip():
+                st.warning("⚠️ No speech detected in the audio")
+                return
+            
+            # Add user message to chat history
+            st.session_state.chat_history.append({
+                "role": "user",
+                "content": f"🎙️ {query_text}",
+                "transcription": transcribe_result
+            })
+            
+            # Step 2: Query RAG system
+            query_payload = {
+                "query": query_text,
+                "include_sources": True
+            }
+            
+            query_response, error = make_api_request("/query/text", "POST", json=query_payload)
+            
+            if error or not query_response or query_response.status_code != 200:
+                st.error(f"❌ RAG query failed: {error or 'Unknown error'}")
+                return
+            
+            query_result = query_response.json()
+            answer = query_result.get('answer', '')
+            
+            # Step 3: Synthesize response
+            tts_payload = {
+                "text": answer,
+                "voice": voice,
+                "output_format": "mp3",
+                "use_cache": True
+            }
+            
+            tts_response, error = make_api_request("/voice/synthesize/base64", "POST", json=tts_payload)
+            
+            if error or not tts_response or tts_response.status_code != 200:
+                st.warning("⚠️ Voice synthesis failed, but text response is available")
+                audio_base64 = None
+            else:
+                tts_result = tts_response.json()
+                audio_base64 = tts_result.get('audio_base64')
+            
+            # Add assistant response to chat history
+            assistant_message = {
+                "role": "assistant",
+                "content": answer,
+                "sources": query_result.get('sources', []),
+                "transcription": transcribe_result
+            }
+            
+            if audio_base64:
+                assistant_message["audio_base64"] = audio_base64
+                assistant_message["mime_type"] = tts_result.get('mime_type', 'audio/mpeg')
+            
+            st.session_state.chat_history.append(assistant_message)
+            
+            st.success("✅ Voice query processed successfully!")
+            
+            # Play audio if available
+            if audio_base64:
+                audio_bytes = base64.b64decode(audio_base64)
+                st.audio(audio_bytes, format="audio/mpeg")
+            
+            time.sleep(1)
+            st.rerun()
+            
+        except Exception as e:
+            st.error(f"❌ Error processing voice query: {str(e)}")
+
+def _transcribe_audio_only(audio_data: Dict[str, Any], api_url: str):
+    """Only transcribe audio without querying RAG"""
+    
+    with st.spinner("🔊 Transcribing audio..."):
+        try:
+            voice_settings = st.session_state.get("voice_settings", {})
+            language = voice_settings.get("stt_language", "auto")
+            
+            payload = {
+                "audio_base64": audio_data['audio_data'],
+                "mime_type": audio_data.get('mime_type', 'audio/webm')
+            }
+            
+            if language != "auto":
+                payload["language"] = language
+            
+            response, error = make_api_request("/voice/transcribe-base64", "POST", json=payload)
+            
+            if error or not response or response.status_code != 200:
+                st.error(f"❌ Transcription failed: {error or 'Unknown error'}")
+                return
+            
+            result = response.json()
+            transcribed_text = result.get('text', '')
+            
+            if transcribed_text.strip():
+                st.success(f"✅ Transcription completed!")
+                st.text_area("Transcribed Text:", value=transcribed_text, height=100, disabled=True)
+                
+                # Show metadata
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Language", result.get('language', 'Unknown'))
+                with col2:
+                    confidence = result.get('confidence', 0)
+                    st.metric("Confidence", f"{confidence:.2f}")
+                with col3:
+                    duration = result.get('duration', 0)
+                    st.metric("Duration", f"{duration:.1f}s")
+                
+                # Option to use this text for querying
+                if st.button("🧠 Ask RAG System", key="query_from_transcription"):
+                    # Add to text input for processing
+                    st.session_state.temp_query_text = transcribed_text
+                    st.rerun()
+            else:
+                st.warning("⚠️ No speech detected in the audio")
+                
+        except Exception as e:
+            st.error(f"❌ Error transcribing audio: {str(e)}")
+
+def _process_uploaded_file(uploaded_file, api_url: str):
+    """Process uploaded audio file"""
+    
+    with st.spinner("🎯 Processing uploaded audio..."):
+        try:
+            # Read file content
+            audio_bytes = uploaded_file.read()
+            audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+            
+            audio_data = {
+                'audio_data': audio_base64,
+                'mime_type': uploaded_file.type,
+                'size': len(audio_bytes),
+                'filename': uploaded_file.name
+            }
+            
+            # Process through the voice pipeline
+            _process_recorded_audio(audio_data, api_url)
+            
+        except Exception as e:
+            st.error(f"❌ Error processing uploaded file: {str(e)}")
+
+def _transcribe_uploaded_file(uploaded_file, api_url: str):
+    """Only transcribe uploaded audio file"""
+    
+    with st.spinner("🔊 Transcribing uploaded audio..."):
+        try:
+            # Read file content
+            audio_bytes = uploaded_file.read()
+            audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+            
+            audio_data = {
+                'audio_data': audio_base64,
+                'mime_type': uploaded_file.type,
+                'size': len(audio_bytes),
+                'filename': uploaded_file.name
+            }
+            
+            # Transcribe only
+            _transcribe_audio_only(audio_data, api_url)
+            
+        except Exception as e:
+            st.error(f"❌ Error transcribing uploaded file: {str(e)}")
+
+# Check for temporary query text from transcription
+if 'temp_query_text' in st.session_state:
+    temp_text = st.session_state.temp_query_text
+    del st.session_state.temp_query_text
+    
+    # Add to chat history and process
+    st.session_state.chat_history.append({"role": "user", "content": temp_text})
+    st.rerun()
+
 st.markdown("---")
-st.caption("💡 Tip: Upload documents first, then ask questions about their content. Use voice input for hands-free interaction.")
+st.caption("💡 Tip: Upload documents first, then ask questions about their content. Use voice input for hands-free interaction. Try the Full Voice Interface for advanced features!")

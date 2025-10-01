@@ -1,7 +1,7 @@
 import json
 import os
 import secrets
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, List
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -72,6 +72,47 @@ class Settings:
     WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "whisper-1")
     ENABLE_WAKE_WORD: bool = os.getenv("ENABLE_WAKE_WORD", "False").lower() == "true"
     WAKE_WORD: str = os.getenv("WAKE_WORD", "hey assistant")
+    
+    # Additional Voice Settings
+    TEMP_AUDIO_DIR: str = os.getenv("TEMP_AUDIO_DIR", "./temp_audio")
+    VOICE_LANGUAGE: str = os.getenv("VOICE_LANGUAGE", "en")
+    TTS_SPEED: float = float(os.getenv("TTS_SPEED", "1.0"))
+    AUDIO_SAMPLE_RATE: int = int(os.getenv("AUDIO_SAMPLE_RATE", "16000"))
+    MAX_AUDIO_DURATION: int = int(os.getenv("MAX_AUDIO_DURATION", "300"))  # 5 minutes
+    
+    # Enhanced TTS Settings
+    TTS_CACHE_DIR: str = os.getenv("TTS_CACHE_DIR", "./cache/tts")
+    TTS_CACHE_MAX_SIZE: int = int(os.getenv("TTS_CACHE_MAX_SIZE", "100"))  # Max cache entries
+    TTS_CACHE_TTL: int = int(os.getenv("TTS_CACHE_TTL", "604800"))  # 7 days in seconds
+    TTS_MAX_TEXT_LENGTH: int = int(os.getenv("TTS_MAX_TEXT_LENGTH", "4096"))  # Max characters
+    TTS_DEFAULT_FORMAT: str = os.getenv("TTS_DEFAULT_FORMAT", "mp3")
+    TTS_QUALITY: str = os.getenv("TTS_QUALITY", "standard")  # standard, high
+    TTS_ENABLE_CACHING: bool = os.getenv("TTS_ENABLE_CACHING", "True").lower() == "true"
+    
+    # Voice UI Settings
+    VOICE_AUTO_PLAY: bool = os.getenv("VOICE_AUTO_PLAY", "False").lower() == "true"
+    VOICE_SHOW_METADATA: bool = os.getenv("VOICE_SHOW_METADATA", "True").lower() == "true"
+    VOICE_CACHE_STATS: bool = os.getenv("VOICE_CACHE_STATS", "True").lower() == "true"
+    
+    # Enhanced STT Settings
+    STT_STREAMING_CHUNK_SIZE: int = int(os.getenv("STT_STREAMING_CHUNK_SIZE", "1024"))
+    STT_STREAMING_BUFFER_SIZE: int = int(os.getenv("STT_STREAMING_BUFFER_SIZE", "8192"))
+    STT_STREAMING_MAX_DURATION: int = int(os.getenv("STT_STREAMING_MAX_DURATION", "300"))  # 5 minutes
+    STT_SILENCE_THRESHOLD: float = float(os.getenv("STT_SILENCE_THRESHOLD", "0.5"))  # seconds
+    STT_ENABLE_LANGUAGE_DETECTION: bool = os.getenv("STT_ENABLE_LANGUAGE_DETECTION", "True").lower() == "true"
+    STT_LANGUAGE_CONFIDENCE_THRESHOLD: float = float(os.getenv("STT_LANGUAGE_CONFIDENCE_THRESHOLD", "0.7"))
+    STT_SUPPORTED_LANGUAGES: List[str] = os.getenv("STT_SUPPORTED_LANGUAGES", "en,es,fr,de,it,pt,nl,pl,ru,ja,ko,zh,ar").split(",")
+    STT_ENABLE_NOISE_REDUCTION: bool = os.getenv("STT_ENABLE_NOISE_REDUCTION", "True").lower() == "true"
+    STT_ENABLE_AUDIO_ENHANCEMENT: bool = os.getenv("STT_ENABLE_AUDIO_ENHANCEMENT", "True").lower() == "true"
+    STT_NOISE_REDUCTION_STRENGTH: float = float(os.getenv("STT_NOISE_REDUCTION_STRENGTH", "0.8"))
+    STT_ENABLE_NORMALIZATION: bool = os.getenv("STT_ENABLE_NORMALIZATION", "True").lower() == "true"
+    STT_ENABLE_SPECTRAL_GATING: bool = os.getenv("STT_ENABLE_SPECTRAL_GATING", "True").lower() == "true"
+    STT_TRANSCRIPTION_TEMPERATURE: float = float(os.getenv("STT_TRANSCRIPTION_TEMPERATURE", "0.2"))
+    STT_ENABLE_WORD_TIMESTAMPS: bool = os.getenv("STT_ENABLE_WORD_TIMESTAMPS", "True").lower() == "true"
+    STT_ENABLE_SEGMENT_TIMESTAMPS: bool = os.getenv("STT_ENABLE_SEGMENT_TIMESTAMPS", "True").lower() == "true"
+    STT_MAX_AUDIO_LENGTH: int = int(os.getenv("STT_MAX_AUDIO_LENGTH", "600"))  # 10 minutes
+    STT_MIN_AUDIO_QUALITY_THRESHOLD: float = float(os.getenv("STT_MIN_AUDIO_QUALITY_THRESHOLD", "0.3"))
+    STT_ENABLE_QUALITY_ANALYSIS: bool = os.getenv("STT_ENABLE_QUALITY_ANALYSIS", "True").lower() == "true"
 
     # Database Settings
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/devplanning.db")
@@ -123,6 +164,7 @@ class Settings:
             self.DEVPLAN_VECTOR_STORE_PATH,
             self.PROJECT_VECTOR_STORE_PATH,
             self.UPLOAD_PATH,
+            self.TEMP_AUDIO_DIR,
         ):
             try:
                 if path:
