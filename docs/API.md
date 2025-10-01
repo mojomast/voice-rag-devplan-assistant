@@ -7,6 +7,8 @@ Complete reference for the Voice-Enabled RAG System REST API.
 http://localhost:8000
 ```
 
+> ℹ️ Looking for semantic plan/project search? See `docs/API_SEARCH.md` for the full Phase 4 search endpoint reference and examples.
+
 ## Authentication
 Currently, no authentication is required for local development. For production deployments, implement appropriate authentication mechanisms.
 

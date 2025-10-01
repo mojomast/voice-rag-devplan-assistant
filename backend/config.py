@@ -1,6 +1,7 @@
+import json
 import os
 import secrets
-from typing import Optional, Set
+from typing import Dict, Optional, Set
 from dotenv import load_dotenv
 from loguru import logger
 
@@ -26,10 +27,16 @@ class Settings:
     SENTINEL_OPENAI_KEYS_LOWER: Set[str] = {value.lower() for value in SENTINEL_OPENAI_KEYS}
     SENTINEL_REQUESTY_KEYS_LOWER: Set[str] = {value.lower() for value in SENTINEL_REQUESTY_KEYS}
 
+    DEFAULT_MODEL_ROUTING: Dict[str, str] = {
+        "zai/glm-4.5": "openai/gpt-4o-mini"
+    }
+
     # API Keys (initial raw values; normalized in __init__)
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     REQUESTY_API_KEY: str = os.getenv("REQUESTY_API_KEY", "")  # Legacy
     ROUTER_API_KEY: str = os.getenv("ROUTER_API_KEY", "")  # Requesty router
+    REQUESTY_MODEL_ROUTING_RAW: str = os.getenv("REQUESTY_MODEL_ROUTING", "")
+    REQUESTY_MODEL_ROUTING: Dict[str, str] = {}
 
     # Test Mode (will be recalculated in __init__)
     TEST_MODE: bool = os.getenv("TEST_MODE", "false").lower() == "true"
@@ -54,7 +61,7 @@ class Settings:
     # LLM Settings
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
     TEMPERATURE: float = float(os.getenv("TEMPERATURE", 0.7))
-    REQUESTY_PLANNING_MODEL: str = os.getenv("REQUESTY_PLANNING_MODEL", "requesty/glm-4.5")
+    REQUESTY_PLANNING_MODEL: str = os.getenv("REQUESTY_PLANNING_MODEL", "zai/glm-4.5")
     REQUESTY_EMBEDDING_MODEL: str = os.getenv("REQUESTY_EMBEDDING_MODEL", "requesty/embedding-001")
     PLANNING_MAX_TOKENS: int = int(os.getenv("PLANNING_MAX_TOKENS", 2200))
     PLANNING_TEMPERATURE: float = float(os.getenv("PLANNING_TEMPERATURE", 0.4))
@@ -75,13 +82,26 @@ class Settings:
     # Application Settings
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    REQUIRE_ADMIN_TOKEN: bool = os.getenv("REQUIRE_ADMIN_TOKEN", "True").lower() == "true"
 
     ADMIN_API_TOKEN_ENV_KEYS: Set[str] = {"RUNTIME_ADMIN_TOKEN", "ADMIN_API_TOKEN"}
+    ADMIN_TOKEN_SENTINELS: Set[str] = {
+        "",
+        "none",
+        "null",
+        "placeholder",
+        "changeme",
+        "your-secure-token-here-change-this",
+        "your_secure_token_here_change_this",
+        "replace-me",
+    }
+    ADMIN_TOKEN_SENTINELS_LOWER: Set[str] = {value.lower() for value in ADMIN_TOKEN_SENTINELS}
 
     def __init__(self):
         self.OPENAI_API_KEY = self._normalize_key(self.OPENAI_API_KEY, self.SENTINEL_OPENAI_KEYS_LOWER)
         self.REQUESTY_API_KEY = self._normalize_key(self.REQUESTY_API_KEY, self.SENTINEL_REQUESTY_KEYS_LOWER)
         self.ROUTER_API_KEY = self._normalize_key(self.ROUTER_API_KEY, self.SENTINEL_REQUESTY_KEYS_LOWER)
+        self.REQUESTY_MODEL_ROUTING = self._parse_model_routing(self.REQUESTY_MODEL_ROUTING_RAW)
 
         explicit_test_mode = os.getenv("TEST_MODE")
         if explicit_test_mode is None:
@@ -110,14 +130,48 @@ class Settings:
             except OSError as exc:  # pragma: no cover - best-effort directory creation
                 logger.warning("Failed to ensure directory %s: %s", path, exc)
 
+    def _parse_model_routing(self, raw: str) -> Dict[str, str]:
+        def _normalize_map(source: Dict[str, str]) -> Dict[str, str]:
+            normalized: Dict[str, str] = {}
+            for key, value in source.items():
+                key_str = str(key).strip().lower()
+                value_str = str(value).strip()
+                if key_str and value_str:
+                    normalized[key_str] = value_str
+            return normalized
+
+        routing = _normalize_map(self.DEFAULT_MODEL_ROUTING)
+
+        if not raw:
+            return routing
+
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                routing.update(_normalize_map(data))
+                return routing
+        except json.JSONDecodeError:
+            logger.warning("REQUESTY_MODEL_ROUTING environment variable is not valid JSON; using defaults")
+
+        return routing
+
     def _load_admin_token(self) -> str:
         """Load and normalize the runtime admin token."""
+        if not self.REQUIRE_ADMIN_TOKEN:
+            logger.warning("REQUIRE_ADMIN_TOKEN is False - admin token validation is DISABLED for testing/development")
+            return ""
+        
         for env_key in self.ADMIN_API_TOKEN_ENV_KEYS:
             value = os.getenv(env_key)
             if value:
                 token = value.strip()
-                if token:
+                if token and token.lower() not in self.ADMIN_TOKEN_SENTINELS_LOWER:
                     return token
+                if token:
+                    logger.warning(
+                        "Ignoring placeholder admin token from %s. Configure a secure value to enable runtime updates.",
+                        env_key
+                    )
 
         if self.TEST_MODE:
             test_token = os.getenv("TEST_ADMIN_TOKEN", "test-admin-token").strip()
@@ -144,10 +198,15 @@ class Settings:
 
     def requires_admin_token(self) -> bool:
         """Determine if admin token validation is required for runtime updates."""
+        if not self.REQUIRE_ADMIN_TOKEN:
+            return False
         return bool(self.RUNTIME_ADMIN_TOKEN)
 
     def validate_admin_token(self, token: Optional[str]) -> bool:
         """Validate the provided admin token against configuration."""
+        if not self.REQUIRE_ADMIN_TOKEN:
+            return True
+        
         if not self.requires_admin_token():
             return self.TEST_MODE
 

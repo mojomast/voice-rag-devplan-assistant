@@ -189,6 +189,23 @@ def _update_plan_status(plan_id: str, new_status: str) -> Optional[Dict]:
     return parse_response_json(response)
 
 
+def _search_plans(query: str, project_id: Optional[str] = None, limit: int = 5) -> List[Dict]:
+    """Search plans using semantic search API."""
+    payload = {
+        "query": query,
+        "project_id": project_id,
+        "limit": limit,
+    }
+    response, error = api_request("POST", "/search/plans", json=payload)
+    if error:
+        st.warning(f"Search failed: {error}")
+        return []
+    if response is None or response.status_code != 200:
+        return []
+    data = parse_response_json(response) or {}
+    return data.get("results", [])
+
+
 def _render_plan_preview(plan: Dict) -> None:
     latest_version = _latest_plan_version(plan)
     content = latest_version.get("content", "") if latest_version else "No content"
@@ -267,6 +284,72 @@ def main() -> None:
     
     # Log page view
     telemetry.log_page_view("planning_chat", {"project_id": st.session_state.get("planning_selected_project_id")})
+
+    # Sidebar for semantic search
+    with st.sidebar:
+        st.markdown("### 🔍 Search Past Plans")
+        st.caption("Find relevant plans using semantic search")
+        
+        search_query = st.text_input(
+            "Search",
+            placeholder="e.g., authentication system",
+            key="plan_search_query"
+        )
+        
+        search_scope = st.radio(
+            "Search Scope",
+            ["Current Project", "All Projects"],
+            key="plan_search_scope"
+        )
+        
+        if search_query and st.button("🔍 Search", use_container_width=True):
+            project_filter = st.session_state.get("planning_selected_project_id") if search_scope == "Current Project" else None
+            
+            with st.spinner("Searching..."):
+                results = _search_plans(search_query, project_id=project_filter, limit=5)
+            
+            if not results:
+                st.info("No matching plans found.")
+            else:
+                st.success(f"Found {len(results)} relevant plan(s)")
+                
+                for result in results:
+                    score_pct = result.get('score', 0) * 100
+                    with st.expander(f"📋 {result['title']} ({score_pct:.0f}%)", expanded=False):
+                        st.caption(f"**ID:** `{result['id']}`")
+                        metadata = result.get('metadata', {})
+                        st.caption(f"**Status:** {metadata.get('status', 'unknown')}")
+                        st.caption(f"**Project:** {metadata.get('project_id', 'N/A')[:16]}...")
+                        
+                        # Preview
+                        preview = result.get('content_preview', '')[:200]
+                        if preview:
+                            with st.container():
+                                st.markdown("**Preview:**")
+                                st.text(preview + "...")
+                        
+                        # Actions
+                        action_cols = st.columns(2)
+                        with action_cols[0]:
+                            if st.button("View Full Plan", key=f"view_{result['id']}", use_container_width=True):
+                                plan = _fetch_plan(result['id'])
+                                if plan:
+                                    st.session_state.planning_generated_plans[result['id']] = plan
+                                    _toast(f"Added '{result['title']}' to current view", icon="📋")
+                                    st.rerun()
+                        with action_cols[1]:
+                            if st.button("Use as Context", key=f"ctx_{result['id']}", use_container_width=True):
+                                context_msg = f"Please reference this plan: {result['title']} (ID: {result['id']})"
+                                st.session_state.planning_chat_history.append({
+                                    "role": "user",
+                                    "content": context_msg,
+                                })
+                                st.session_state.planning_pending_message = context_msg
+                                _toast("Context added to conversation", icon="💬")
+                                st.rerun()
+        
+        st.markdown("---")
+        st.caption("💡 **Tip:** Search is powered by semantic RAG—it understands concepts, not just keywords!")
 
     st.title(PAGE_TITLE)
     st.caption("Chat with the planning agent to create and iterate on development plans.")

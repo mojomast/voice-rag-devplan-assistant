@@ -22,11 +22,27 @@ class RequestyClient:
     def __init__(self) -> None:
         self.router_api_key = settings.ROUTER_API_KEY
         self.requesty_api_key = settings.REQUESTY_API_KEY  # Legacy fallback support
+        if not self.router_api_key and self.requesty_api_key:
+            self.router_api_key = self.requesty_api_key
+            logger.info(
+                "Requesty Router key not provided; using legacy Requesty API key for router access"
+            )
         self.openai_api_key = settings.OPENAI_API_KEY
+        if self.openai_api_key and not self._looks_like_openai_key(self.openai_api_key):
+            logger.warning("OpenAI API key appears to be a placeholder; disabling direct OpenAI usage")
+            self.openai_api_key = ""
         self.test_mode = settings.TEST_MODE
+        self.model_routing = getattr(settings, "REQUESTY_MODEL_ROUTING", {})
 
-        self.default_chat_model = settings.REQUESTY_PLANNING_MODEL or settings.LLM_MODEL
-        self.default_embedding_model = settings.REQUESTY_EMBEDDING_MODEL or settings.EMBEDDING_MODEL
+        # Default to OpenAI-native models
+        self.default_chat_model = settings.LLM_MODEL
+        self.default_embedding_model = settings.EMBEDDING_MODEL
+
+        if self.router_api_key:
+            if settings.REQUESTY_PLANNING_MODEL:
+                self.default_chat_model = settings.REQUESTY_PLANNING_MODEL
+            if settings.REQUESTY_EMBEDDING_MODEL:
+                self.default_embedding_model = settings.REQUESTY_EMBEDDING_MODEL
 
         self.router_client: Optional[OpenAI] = None
         self.openai_client: Optional[OpenAI] = None
@@ -67,14 +83,17 @@ class RequestyClient:
     def chat_completion(self, messages: List[Dict[str, str]], model: Optional[str] = None, **kwargs) -> str:
         """Generate a chat completion synchronously."""
         target_model = model or self.default_chat_model
+        resolved_model = self._resolve_model_alias(target_model)
+        if resolved_model != target_model:
+            logger.info("Routing model %s -> %s", target_model, resolved_model)
 
         if self.use_router and self.router_client:
-            return self._router_chat_completion(messages, target_model, **kwargs)
+            return self._router_chat_completion(messages, resolved_model, **kwargs)
 
         if self.openai_client:
-            return self._openai_chat_completion(messages, target_model, **kwargs)
+            return self._openai_chat_completion(messages, resolved_model, **kwargs)
 
-        return self._fallback_completion(messages, target_model, **kwargs)
+        return self._fallback_completion(messages, resolved_model, **kwargs)
 
     async def achat_completion(self, messages: List[Dict[str, str]], model: Optional[str] = None, **kwargs) -> str:
         """Asynchronous helper for chat completions."""
@@ -103,28 +122,40 @@ class RequestyClient:
                 )
             return content
         except Exception as exc:
-            logger.warning(f"Requesty Router request failed: {exc}")
+            logger.warning(
+                "Requesty Router request failed for model {}: {}",
+                router_model,
+                exc,
+            )
             return self._fallback_completion(messages, model, **kwargs)
 
     def _openai_chat_completion(self, messages: List[Dict[str, str]], model: str, **kwargs) -> str:
         if not self.openai_client:
             raise RuntimeError("OpenAI API key not configured for fallback usage")
 
-        response = self.openai_client.chat.completions.create(  # type: ignore[union-attr]
-            model=model,
-            messages=messages,
-            temperature=kwargs.get("temperature", settings.TEMPERATURE),
-            max_tokens=kwargs.get("max_tokens", 2000),
-        )
-
-        content = response.choices[0].message.content
-        if response.usage:
-            logger.info(
-                "OpenAI usage - model=%s, total_tokens=%s",
-                model,
-                getattr(response.usage, "total_tokens", "?"),
+        try:
+            response = self.openai_client.chat.completions.create(  # type: ignore[union-attr]
+                model=model,
+                messages=messages,
+                temperature=kwargs.get("temperature", settings.TEMPERATURE),
+                max_tokens=kwargs.get("max_tokens", 2000),
             )
-        return content
+
+            content = response.choices[0].message.content
+            if response.usage:
+                logger.info(
+                    "OpenAI usage - model=%s, total_tokens=%s",
+                    model,
+                    getattr(response.usage, "total_tokens", "?"),
+                )
+            return content
+        except Exception as exc:
+            logger.warning(
+                "OpenAI fallback request failed: {}. Disabling OpenAI client and returning deterministic response",
+                exc,
+            )
+            self.openai_client = None
+            return self._fallback_completion(messages, model, **kwargs)
 
     # ------------------------------------------------------------------
     # Embeddings
@@ -207,3 +238,27 @@ class RequestyClient:
         if model.startswith("glm") or model.startswith("embedding"):
             return f"requesty/{model}"
         return f"openai/{model}"
+
+    @staticmethod
+    def _looks_like_openai_key(value: str) -> bool:
+        normalized = value.strip()
+        if not normalized:
+            return False
+
+        valid_prefixes = ("sk-", "rk-", "sess-", "org-", "deploy-")
+        return normalized.startswith(valid_prefixes)
+
+    def _resolve_model_alias(self, model: str) -> str:
+        if not self.model_routing:
+            return model
+
+        direct = self.model_routing.get(model)
+        if direct:
+            return direct
+
+        lowered = model.lower()
+        aliased = self.model_routing.get(lowered)
+        if aliased:
+            return aliased
+
+        return model

@@ -1,8 +1,8 @@
 # Development Planning Feature – Phases 1 & 2 Setup
 
-This guide summarises the delivered capabilities for the development planning stack (backend agent + Streamlit UI baseline) and how to run, configure, and test them. Consult `dev-planning-roadmap.md` for the in-progress Phase 3 backlog and future phases.
+This guide summarises the delivered capabilities for the development planning stack (backend agent + Streamlit UI) and how to run, configure, and test them. Consult `nextphase.md` for the Phase 4 validation checklist and `dev-planning-roadmap.md` for future phases.
 
-> **Last updated:** 2025-09-30 — Phases 1 & 2 are complete; Phase 3 frontend polish and collaboration tooling are underway.
+> **Last updated:** 2025-09-30 — Phases 1-3 are complete; Phase 4 RAG integration is feature-complete with validation/documentation polish in flight.
 
 ## ✅ Delivered Capabilities
 
@@ -21,6 +21,17 @@ This guide summarises the delivered capabilities for the development planning st
 - **Telemetry & resilience**: Structured logging captures latency metrics, non-JSON fallbacks are handled gracefully, and Requesty/OpenAI API failures surface actionable errors.
 - **Streamlit integration**: `frontend/pages/planning_chat.py`, `project_browser.py`, and `devplan_viewer.py` consume the live APIs for chat, browsing, and plan management workflows.
 - **Test coverage**: 29 green tests across `tests/unit/test_planning_agent.py`, `tests/unit/test_plan_generator.py`, and `tests/integration/test_planning_chat.py` validate orchestration and Requesty integration.
+
+### Phase 4 — RAG Integration & Semantic Search (Feature Complete)
+
+- **DevPlan Processor**: `backend/devplan_processor.py` chunks markdown plans, generates embeddings via Requesty `embedding-001`, and syncs the FAISS store at `vector_store/devplans`.
+- **Auto Indexer**: `backend/auto_indexer.py` hooks plan/project/conversation events, reindexes updates, and purges stale chunks before saving.
+- **Project Memory System**: `backend/project_memory.py` assembles project context, key decisions, lessons, and similar-project lookups for the planning agent.
+- **Search APIs**: `backend/routers/search.py` serves `/search/plans`, `/search/projects`, `/search/related-plans/{plan_id}`, `/search/similar-projects/{project_id}` with score metadata.
+- **Frontend Enhancements**: `frontend/pages/project_browser.py` now surfaces related projects with navigation, while `frontend/pages/planning_chat.py` offers semantic plan search with "View Full Plan" and "Use as context" helpers.
+- **Bulk Re-indexing**: `python -m backend.scripts.reindex_all --dry-run` seeds/refreshed vector stores for legacy content; flags support plans/projects/conversations subsets.
+
+> ✅ Feature work is complete. Before marking the phase at 100%, run `python test_phase4.py` with the backend online, capture results in `PHASE4_PROGRESS.md`, and update documentation status lines to 100%.
 
 ## ⚙️ Configuration
 
@@ -43,9 +54,10 @@ This guide summarises the delivered capabilities for the development planning st
 
 ## 🚀 Running the Planning Assistant
 
-1. **Start the backend**
+1. **Start the backend** (run from `voice-rag-system` root so the `backend` package resolves)
    ```powershell
-   uvicorn backend.main:app --reload
+   cd C:\Users\kyle\projects\noteagent\voice-rag-system
+   $env:PYTHONPATH="$PWD"; ..\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload
    ```
 2. **Launch the Streamlit interface**
    ```powershell
@@ -82,11 +94,21 @@ pytest tests/integration/test_planning_chat.py -q
 
 Enable `TEST_MODE=true` (default) to run the suite without real Requesty/OpenAI credentials. For manual smoke tests, point the Streamlit UI at the local backend and exercise chat → plan → version creation flows.
 
+### Phase 4 validation script
+
+```powershell
+# Backend must be running first
+python test_phase4.py
+```
+
+If you see `Database not found at data\devplanning.db` or `Backend failed to start`, launch the backend using the command above to create the SQLite database, or run `python -m backend.scripts.reindex_all --dry-run` to seed the vector stores before retrying.
+
 ## 🔗 Related References
 
 - `PHASE1_QUICKSTART.md` — historical walkthrough for Phase 1 scaffolding.
 - `PHASE2_TEST_RESULTS.md` — detailed outcome of the 29 automated tests covering the agent pipeline.
-- `dev-planning-roadmap.md` — canonical multi-phase roadmap with Phase 3 backlog details.
+- `PHASE4_PROGRESS.md` — live status tracker for validation tasks and documentation updates.
+- `dev-planning-roadmap.md` — canonical multi-phase roadmap with Phase 4 validation notes and future work.
 - `docs/USER_GUIDE.md` — end-user documentation (will gain planning updates alongside Phase 3).
 
 ## 🚧 Phase 3 Backlog Snapshot

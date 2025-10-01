@@ -2,12 +2,12 @@
 
 Transform the voice-rag-system into an intelligent development planning assistant that helps developers create and iterate on development plans via conversational LLM, remembers all projects and past conversations, allows voice and text interaction for creating devplans, persists all planning documents and iterations in the vector store, and provides project-aware context for continuing work across sessions.
 
-> **Status Snapshot — 2025-10-01 (FINAL PHASE 3 UPDATE)**
+> **Status Snapshot — 2025-09-30 (Phase 4 validation in progress)**
 >
-> • **Phase 1 complete**: Async database layer, SQLAlchemy models, storage services, FastAPI routers, and unit tests are live.<br>
-> • **Phase 2 complete**: `PlanningAgent`, `DevPlanGenerator`, and `PlanningContextManager` implemented with Requesty integration; comprehensive test suite (29 tests); structured telemetry.<br>
-> • **Phase 3 COMPLETE**: Full-featured production UI delivered including real-time auto-refresh, quick action buttons, project health widgets, prompt template library (9 templates), enhanced notifications, status visualization, frontend telemetry system, accessibility guidelines, and E2E test framework.<br>
-> • **Phase 4 READY**: See `nextphase.md` for RAG Integration & Indexing implementation roadmap.
+> • **Phase 1 COMPLETE**: Async database layer, SQLAlchemy models, storage services, FastAPI routers, and unit tests are live.<br>
+> • **Phase 2 COMPLETE**: `PlanningAgent`, `DevPlanGenerator`, and `PlanningContextManager` implemented with Requesty integration; comprehensive test suite (29 tests); structured telemetry.<br>
+> • **Phase 3 COMPLETE**: Production UI delivering real-time refresh, quick actions, health widgets, prompt templates, notifications, telemetry, accessibility docs, and E2E test framework.<br>
+> • **Phase 4 92% DONE**: RAG indexing, semantic search APIs, related-projects UI, and planning-chat search shipped; final validation + documentation polish tracked in `PHASE4_PROGRESS.md`.
 
 ## Phase Progress Dashboard
 
@@ -16,7 +16,7 @@ Transform the voice-rag-system into an intelligent development planning assistan
 | Phase 1 | Core data layer & REST APIs | ✅ Completed | Backend models (`backend/models.py`), stores (`backend/storage/`), routers, migrations, and unit tests shipped. |
 | Phase 2 | LLM planning agent & Requesty integration | ✅ Completed (2025-09-30) | `PlanningAgent`, `DevPlanGenerator`, `PlanningContextManager` with Requesty integration, comprehensive test coverage (29 tests), and telemetry logging. |
 || Phase 3 | Frontend experience | ✅ Completed (2025-10-01) | Production-ready UI: real-time refresh, quick actions, health widgets, prompt templates, notifications, telemetry, accessibility docs, E2E test framework. |
-|| Phase 4 | RAG indexing & memory | 🚀 Ready to start | Vector-store ingest for plans/projects; semantic search and context retrieval. See `nextphase.md` for roadmap. |
+|| Phase 4 | RAG indexing & memory | � Validation (92%) | Feature work complete; backend tests + documentation updates tracked in `nextphase.md` & `PHASE4_PROGRESS.md`. |
 | Phase 5+ | Voice + advanced features | ⏳ Future | Voice planning pipeline, collaboration, analytics, etc. |
 
 ## Delivered in Phase 1 (Summary)

@@ -62,6 +62,17 @@ def _fetch_conversations(project_id: str) -> List[Dict]:
     return parse_response_json(response) or []
 
 
+def _fetch_related_projects(project_id: str, limit: int = 5) -> List[Dict]:
+    """Fetch semantically similar projects using RAG."""
+    response, error = api_request("GET", f"/search/similar-projects/{project_id}", params={"limit": limit})
+    if error:
+        st.warning(f"Could not load related projects: {error}")
+        return []
+    if response is None or response.status_code != 200:
+        return []
+    return parse_response_json(response) or []
+
+
 def _get_project_health(project_id: str) -> Dict:
     """Calculate project health metrics."""
     plans = _fetch_plans(project_id)
@@ -217,6 +228,27 @@ def _render_project_details(project_id: str) -> None:
                 with cols[2]:
                     st.caption(f"Project: {plan.get('project_id', '-')}")
 
+    st.markdown("---")
+    st.subheader("🔗 Related Projects")
+    st.caption("Semantically similar projects found via RAG analysis")
+    related = _fetch_related_projects(project_id, limit=5)
+    if not related:
+        st.info("No related projects found. Create more projects to see similarities!")
+    else:
+        for item in related:
+            score_pct = item.get('similarity_score', 0) * 100
+            metadata = item.get('metadata', {})
+            with st.expander(f"📁 {item['title']} — Similarity: {score_pct:.0f}%"):
+                tags = metadata.get('tags', [])
+                if tags:
+                    st.write("Tags:", " ".join(f"`{tag}`" for tag in tags))
+                st.metric("Plans", metadata.get('plan_count', 0))
+                st.metric("Status", metadata.get('status', 'unknown'))
+                if st.button("View This Project", key=f"related_{item['id']}"):
+                    st.session_state["project_browser.selected_project_id"] = item["id"]
+                    _toast(f"Switched to project: {item['title']}", icon="🔗")
+                    st.rerun()
+    
     st.markdown("---")
     st.subheader("Recent Conversations")
     conversations = _fetch_conversations(project_id)

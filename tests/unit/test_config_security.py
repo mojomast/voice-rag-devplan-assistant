@@ -6,12 +6,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-# Ensure backend package is importable
-sys.path.append(str(Path(__file__).parent.parent.parent / "backend"))
+# Ensure backend package is importable as a package
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
-config_module = import_module("config")
+config_module = import_module("backend.config")
 Settings = config_module.Settings
-main = import_module("main")
+main = import_module("backend.main")
 
 
 @pytest.fixture(autouse=True)
@@ -47,18 +47,41 @@ def test_settings_default_admin_token_test_mode(monkeypatch):
     assert temp_settings.validate_admin_token("test-admin-token")
 
 
+def test_settings_ignores_placeholder_admin_token(monkeypatch):
+    """Ensure placeholder admin tokens fall back to the test token in test mode."""
+    for env_key in [
+        "ADMIN_API_TOKEN",
+        "TEST_ADMIN_TOKEN",
+        "TEST_MODE",
+        "OPENAI_API_KEY",
+        "REQUESTY_API_KEY",
+    ]:
+        monkeypatch.delenv(env_key, raising=False)
+
+    monkeypatch.setenv("RUNTIME_ADMIN_TOKEN", "your-secure-token-here-change-this")
+    monkeypatch.setenv("TEST_MODE", "true")
+
+    monkeypatch.setattr(Settings, "OPENAI_API_KEY", "", raising=False)
+    monkeypatch.setattr(Settings, "REQUESTY_API_KEY", "", raising=False)
+
+    temp_settings = Settings()
+
+    assert temp_settings.RUNTIME_ADMIN_TOKEN == "test-admin-token"
+    assert temp_settings.validate_admin_token("test-admin-token")
+
+
 def test_update_configuration_requires_admin_token(monkeypatch):
     """Ensure /config/update rejects unauthorized requests and accepts a valid token."""
     monkeypatch.setattr(main.settings, "RUNTIME_ADMIN_TOKEN", "unit-test-token", raising=False)
     monkeypatch.setattr(main.settings, "TEST_MODE", False, raising=False)
 
-    with patch("main.initialize_performance_optimizations", return_value=None), \
-        patch("main.initialize_security_system", return_value=None), \
-        patch("main.initialize_monitoring_system", return_value=None), \
-        patch("main.shutdown_monitoring_system", return_value=None), \
-        patch("main.DocumentProcessor") as mock_doc_processor, \
-        patch("main.VoiceService") as mock_voice_service, \
-        patch("main.reset_rag_handler", return_value=None):
+    with patch("backend.main.initialize_performance_optimizations", return_value=None), \
+        patch("backend.main.initialize_security_system", return_value=None), \
+        patch("backend.main.initialize_monitoring_system", return_value=None), \
+        patch("backend.main.shutdown_monitoring_system", return_value=None), \
+        patch("backend.main.DocumentProcessor") as mock_doc_processor, \
+        patch("backend.main.VoiceService") as mock_voice_service, \
+        patch("backend.main.reset_rag_handler", return_value=None):
 
         mock_doc_processor.return_value = MagicMock()
         mock_voice_service.return_value = MagicMock()

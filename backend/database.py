@@ -29,7 +29,6 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-@asynccontextmanager
 async def get_session() -> AsyncIterator[AsyncSession]:
     """Provide a transactional scope around a series of operations."""
     async with AsyncSessionLocal() as session:
@@ -37,6 +36,18 @@ async def get_session() -> AsyncIterator[AsyncSession]:
             yield session
             await session.commit()
         except Exception:  # pragma: no cover - re-raise for caller handling
+            await session.rollback()
+            raise
+
+
+@asynccontextmanager
+async def get_async_session_context() -> AsyncIterator[AsyncSession]:
+    """Context manager variant for scripts and background workers."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
             await session.rollback()
             raise
 

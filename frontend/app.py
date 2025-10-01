@@ -444,6 +444,8 @@ if __name__ == "__main__":
 
     if not (already_streamlit or already_bootstrapped):
         os.environ[sentinel] = "1"
-        os.execv(sys.executable, [sys.executable, "-m", "streamlit", "run", __file__])
+        import subprocess
+        subprocess.run([sys.executable, "-m", "streamlit", "run", __file__])
+        sys.exit(0)
 st.markdown("---")
 st.caption("💡 Tip: Upload documents first, then ask questions about their content. Use voice input for hands-free interaction.")

@@ -21,11 +21,13 @@ try:
     from .config import settings
     from .indexing.requesty_embeddings import RequestyEmbeddings
     from .requesty_client import RequestyClient
+    from .small_talk import get_small_talk_response
 except ImportError:  # pragma: no cover - support direct imports in tests
     from auto_indexer import get_auto_indexer
     from config import settings
     from indexing.requesty_embeddings import RequestyEmbeddings
     from requesty_client import RequestyClient
+    from small_talk import get_small_talk_response
 
 class RequestyLLM(BaseLLM):
     """Custom LangChain LLM wrapper for Requesty.ai client"""
@@ -173,17 +175,32 @@ Detailed Answer (include specific details from the context):"""
         preview = "" if query is None else str(query)
         logger.info("Processing query snippet: {}", preview[:100])
 
+        stripped_query = (query or "").strip()
+
+        if not stripped_query:
+            answer = "No query provided."
+            response = {
+                "answer": answer,
+                "sources": [],
+                "query": stripped_query,
+                "status": "error",
+                "error": "empty_query"
+            }
+
+            if self.test_mode:
+                response["test_mode"] = True
+                self._append_test_history(stripped_query, answer, "error", response_type="system")
+            return response
+
+        small_talk_answer = get_small_talk_response(stripped_query)
+        if small_talk_answer:
+            logger.debug("Handled small talk without invoking RAG chain")
+            return self._build_small_talk_response(stripped_query, small_talk_answer)
+
         if self.test_mode:
-            normalized_query = (query or "").strip()
-
-            has_query = bool(normalized_query)
-
-            if not has_query:
-                answer = "No query provided."
-                status = "error"
-            else:
-                answer = f"Test response for: {normalized_query}"
-                status = "success"
+            normalized_query = stripped_query
+            answer = f"Test response for: {normalized_query}"
+            status = "success"
 
             sources = []
 
@@ -200,10 +217,7 @@ Detailed Answer (include specific details from the context):"""
                 except Exception as search_error:  # pragma: no cover - defensive logging only
                     logger.warning(f"TEST_MODE retrieval simulation failed: {search_error}")
 
-            record = {"question": normalized_query, "answer": answer, "status": status}
-            self._conversation_history.append(record)
-            if len(self._conversation_history) > self._history_limit:
-                self._conversation_history = self._conversation_history[-self._history_limit:]
+            self._append_test_history(normalized_query, answer, status)
 
             return {
                 "answer": answer,
@@ -216,19 +230,33 @@ Detailed Answer (include specific details from the context):"""
         try:
             result = self.qa_chain.invoke({"question": query})
 
-            # Process source documents
+            raw_source_documents = result.get("source_documents", []) or []
+
             source_documents = []
-            if 'source_documents' in result:
-                for doc in result['source_documents']:
-                    source_info = {
-                        "source": doc.metadata.get('source', 'Unknown'),
-                        "page": doc.metadata.get('page', 'N/A'),
-                        "content_preview": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
+            for doc in raw_source_documents:
+                source_info = {
+                    "source": doc.metadata.get('source', 'Unknown'),
+                    "page": doc.metadata.get('page', 'N/A'),
+                    "content_preview": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
+                }
+                source_documents.append(source_info)
+
+            answer_text = result.get("answer", "")
+
+            if self._looks_like_insufficient_answer(answer_text) and source_documents:
+                summary_text = self._build_summary_from_sources(source_documents, stripped_query)
+                if summary_text:
+                    logger.debug("Generated contextual summary fallback for insufficient LLM answer")
+                    return {
+                        "answer": summary_text,
+                        "sources": source_documents,
+                        "query": query,
+                        "status": "success",
+                        "metadata": {"response_type": "context_summary"}
                     }
-                    source_documents.append(source_info)
 
             response = {
-                "answer": result["answer"],
+                "answer": answer_text,
                 "sources": source_documents,
                 "query": query,
                 "status": "success"
@@ -246,6 +274,100 @@ Detailed Answer (include specific details from the context):"""
                 "status": "error",
                 "error": str(e)
             }
+
+    def _build_small_talk_response(self, query: str, answer: str) -> Dict:
+        response: Dict[str, Any] = {
+            "answer": answer,
+            "sources": [],
+            "query": query,
+            "status": "success",
+            "metadata": {"response_type": "small_talk"}
+        }
+
+        if self.test_mode:
+            response["test_mode"] = True
+            self._append_test_history(query, answer, "success", response_type="small_talk")
+        else:
+            memory = getattr(self, "memory", None)
+            chat_memory = getattr(memory, "chat_memory", None) if memory else None
+            if chat_memory:
+                try:
+                    chat_memory.add_user_message(query)
+                    chat_memory.add_ai_message(answer)
+                except Exception as exc:  # pragma: no cover - best effort logging
+                    logger.debug("Failed to record small talk in conversation memory: %s", exc)
+
+        return response
+
+    def _append_test_history(
+        self,
+        question: str,
+        answer: str,
+        status: str,
+        *,
+        response_type: str = "default"
+    ) -> None:
+        record = {
+            "question": question,
+            "answer": answer,
+            "status": status,
+            "type": response_type,
+        }
+
+        if not hasattr(self, "_conversation_history") or self._conversation_history is None:
+            self._conversation_history = []
+
+        self._conversation_history.append(record)
+
+        history_limit = getattr(self, "_history_limit", 50)
+        if len(self._conversation_history) > history_limit:
+            self._conversation_history = self._conversation_history[-history_limit:]
+
+    @staticmethod
+    def _looks_like_insufficient_answer(answer: str) -> bool:
+        if not answer:
+            return False
+
+        lowered = answer.lower()
+        insufficient_phrases = (
+            "i don't have enough information",
+            "i don't have enough info",
+            "i cannot find",
+            "i can't find",
+            "no information found",
+            "unable to locate",
+        )
+        return any(phrase in lowered for phrase in insufficient_phrases)
+
+    @staticmethod
+    def _build_summary_from_sources(sources: List[Dict[str, Any]], query: str) -> Optional[str]:
+        if not sources:
+            return None
+
+        summary_lines = [
+            "Here's what I can gather from the matching documents:",
+        ]
+
+        for index, source in enumerate(sources[:3], start=1):
+            source_name = source.get("source", f"Document {index}")
+            preview = source.get("content_preview", "").strip()
+            if not preview:
+                continue
+
+            condensed = " ".join(preview.split())
+            if len(condensed) > 300:
+                condensed = condensed[:300] + "..."
+
+            summary_lines.append(f"- **{source_name}**: {condensed}")
+
+        if len(summary_lines) == 1:
+            return None
+
+        summary_lines.append(
+            "Let me know if you'd like a deeper breakdown or specific actions for this file."
+        )
+
+        return "\n".join(summary_lines)
 
     def search(
         self,
