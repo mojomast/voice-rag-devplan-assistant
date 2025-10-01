@@ -1,0 +1,264 @@
+{
+  "timestamp": "2025-10-01T15:43:06.677643",
+  "test_structure": {
+    "unit": {
+      "directory": "tests/unit",
+      "files": [
+        "test_config_security.py",
+        "test_conversation_store.py",
+        "test_devplan_processor.py",
+        "test_document_processor.py",
+        "test_enhanced_stt.py",
+        "test_enhanced_voice_service.py",
+        "test_planning_agent.py",
+        "test_plan_generator.py",
+        "test_plan_store.py",
+        "test_project_store.py",
+        "test_rag_handler.py",
+        "test_rag_handler_fallback.py",
+        "test_requesty_client.py",
+        "test_small_talk.py",
+        "test_voice_service.py"
+      ],
+      "count": 15
+    },
+    "integration": {
+      "directory": "tests/integration",
+      "files": [
+        "test_api.py",
+        "test_planning_chat.py"
+      ],
+      "count": 2
+    },
+    "frontend": {
+      "directory": "tests/frontend",
+      "files": [
+        "test_voice_components.py"
+      ],
+      "count": 1
+    },
+    "e2e": {
+      "directory": "tests/e2e",
+      "files": [
+        "test_planning_ui.py"
+      ],
+      "count": 1
+    }
+  },
+  "dependencies": {
+    "test_pytest": true,
+    "test_pytest_cov": true,
+    "test_pytest_mock": true,
+    "test_pytest_asyncio": true,
+    "test_httpx": true,
+    "test_responses": true,
+    "test_factory_boy": false,
+    "test_faker": true,
+    "test_pytest_benchmark": true,
+    "test_pytest_xdist": false,
+    "test_bandit": true,
+    "test_safety": true,
+    "core_fastapi": true,
+    "core_uvicorn": true,
+    "core_sqlalchemy": true,
+    "core_openai": true,
+    "core_whisper": true,
+    "core_pydub": true,
+    "core_pyttsx3": true
+  },
+  "file_analysis": {
+    "tests/unit\\test_config_security.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 102,
+      "size_bytes": 3986
+    },
+    "tests/unit\\test_conversation_store.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 35,
+      "size_bytes": 1199
+    },
+    "tests/unit\\test_devplan_processor.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 79,
+      "size_bytes": 2883
+    },
+    "tests/unit\\test_document_processor.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 127,
+      "size_bytes": 5060
+    },
+    "tests/unit\\test_enhanced_stt.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 488,
+      "size_bytes": 20808
+    },
+    "tests/unit\\test_enhanced_voice_service.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 448,
+      "size_bytes": 19173
+    },
+    "tests/unit\\test_planning_agent.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 316,
+      "size_bytes": 10390
+    },
+    "tests/unit\\test_plan_generator.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 436,
+      "size_bytes": 12884
+    },
+    "tests/unit\\test_plan_store.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 60,
+      "size_bytes": 1834
+    },
+    "tests/unit\\test_project_store.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 43,
+      "size_bytes": 1387
+    },
+    "tests/unit\\test_rag_handler.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 250,
+      "size_bytes": 9400
+    },
+    "tests/unit\\test_rag_handler_fallback.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 66,
+      "size_bytes": 1963
+    },
+    "tests/unit\\test_requesty_client.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 149,
+      "size_bytes": 6939
+    },
+    "tests/unit\\test_small_talk.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 78,
+      "size_bytes": 2421
+    },
+    "tests/unit\\test_voice_service.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 238,
+      "size_bytes": 9040
+    },
+    "tests/integration\\test_api.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 250,
+      "size_bytes": 8611
+    },
+    "tests/integration\\test_planning_chat.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 412,
+      "size_bytes": 13236
+    },
+    "tests/frontend\\test_voice_components.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 663,
+      "size_bytes": 24218
+    },
+    "tests/e2e\\test_planning_ui.py": {
+      "syntax_valid": true,
+      "has_test_functions": true,
+      "has_imports": true,
+      "has_pytest_import": true,
+      "line_count": 229,
+      "size_bytes": 8149
+    }
+  },
+  "backend_modules": {
+    "main": false,
+    "voice_service": true,
+    "planning_agent": false,
+    "plan_generator": false,
+    "context_manager": false,
+    "document_processor": true,
+    "rag_handler": true
+  },
+  "environment": {
+    "env_file": true,
+    "env_template": true,
+    "requirements_txt": true,
+    "requirements_test_txt": true,
+    "pytest_ini": true,
+    "backend_dir": true,
+    "frontend_dir": true,
+    "tests_dir": true
+  },
+  "summary": {
+    "test_files": {
+      "total": 19,
+      "valid": 19,
+      "invalid": 0
+    },
+    "dependencies": {
+      "total": 19,
+      "available": 17,
+      "missing": 2
+    },
+    "backend_modules": {
+      "total": 7,
+      "working": 3,
+      "broken": 4
+    },
+    "environment": {
+      "total_checks": 8,
+      "passed": 8,
+      "failed": 0
+    }
+  }
+}

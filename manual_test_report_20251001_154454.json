@@ -1,0 +1,135 @@
+{
+  "timestamp": "2025-10-01T15:44:50.111595",
+  "working_directory": "C:\\Users\\kyle\\projects\\noteagent\\voice-rag-system",
+  "analysis": {
+    "environment": {
+      "env_file": true,
+      "env_template": true,
+      "requirements_txt": true,
+      "requirements_test_txt": true,
+      "pytest_ini": true,
+      "backend_dir": true,
+      "frontend_dir": true,
+      "tests_dir": true
+    },
+    "test_structure": {
+      "unit": {
+        "directory": "tests/unit",
+        "files": [
+          "test_config_security.py",
+          "test_conversation_store.py",
+          "test_devplan_processor.py",
+          "test_document_processor.py",
+          "test_enhanced_stt.py",
+          "test_enhanced_voice_service.py",
+          "test_planning_agent.py",
+          "test_plan_generator.py",
+          "test_plan_store.py",
+          "test_project_store.py",
+          "test_rag_handler.py",
+          "test_rag_handler_fallback.py",
+          "test_requesty_client.py",
+          "test_small_talk.py",
+          "test_voice_service.py"
+        ],
+        "count": 15
+      },
+      "integration": {
+        "directory": "tests/integration",
+        "files": [
+          "test_api.py",
+          "test_planning_chat.py"
+        ],
+        "count": 2
+      },
+      "frontend": {
+        "directory": "tests/frontend",
+        "files": [
+          "test_voice_components.py"
+        ],
+        "count": 1
+      },
+      "e2e": {
+        "directory": "tests/e2e",
+        "files": [
+          "test_planning_ui.py"
+        ],
+        "count": 1
+      }
+    },
+    "dependencies": {
+      "test_pytest": true,
+      "test_pytest_cov": true,
+      "test_pytest_mock": true,
+      "test_pytest_asyncio": true,
+      "test_httpx": true,
+      "test_responses": true,
+      "test_factory_boy": false,
+      "test_faker": true,
+      "test_pytest_benchmark": true,
+      "test_pytest_xdist": false,
+      "test_bandit": true,
+      "test_safety": true,
+      "core_fastapi": true,
+      "core_uvicorn": true,
+      "core_sqlalchemy": true,
+      "core_openai": true,
+      "core_whisper": true,
+      "core_pydub": true,
+      "core_pyttsx3": true
+    },
+    "backend_modules": {
+      "main": false,
+      "voice_service": true,
+      "planning_agent": false,
+      "plan_generator": false,
+      "context_manager": false,
+      "document_processor": true,
+      "rag_handler": true
+    },
+    "key_test_files": {
+      "test_dependencies.py": {
+        "valid": false,
+        "error": "'charmap' codec can't decode byte 0x9d in position 529: character maps to <undefined>"
+      },
+      "test_phase4.py": {
+        "valid": false,
+        "error": "'charmap' codec can't decode byte 0x9d in position 456: character maps to <undefined>"
+      },
+      "tests/benchmark_performance.py": {
+        "valid": false,
+        "error": "'charmap' codec can't decode byte 0x8d in position 4064: character maps to <undefined>"
+      }
+    }
+  },
+  "summary": {
+    "environment": {
+      "passed": 8,
+      "total": 8,
+      "percentage": 100.0
+    },
+    "dependencies": {
+      "passed": 17,
+      "total": 19,
+      "percentage": 89.47368421052632
+    },
+    "backend_modules": {
+      "passed": 3,
+      "total": 7,
+      "percentage": 42.857142857142854
+    },
+    "test_files": {
+      "passed": 0,
+      "total": 3,
+      "percentage": 0.0
+    },
+    "total_test_files_found": 19
+  },
+  "overall_status": "GOOD",
+  "overall_percentage": 75.67567567567568,
+  "recommendations": [
+    "Install missing dependencies, especially test dependencies",
+    "Fix backend module imports and dependencies",
+    "Fix syntax errors in test files"
+  ]
+}

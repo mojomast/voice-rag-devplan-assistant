@@ -1,0 +1,89 @@
+{
+  "timestamp": "2025-10-01T15:53:53.407245",
+  "benchmark_version": "1.0",
+  "results": {
+    "document_processing": {
+      "small": {
+        "avg_time": 0.004357814788818359,
+        "min_time": 0.0003814697265625,
+        "max_time": 0.012173175811767578,
+        "std_dev": 0.006768649478279207,
+        "file_size": 550,
+        "iterations": 3
+      },
+      "medium": {
+        "avg_time": 0.0062266190846761065,
+        "min_time": 0.0015878677368164062,
+        "max_time": 0.015493392944335938,
+        "std_dev": 0.008025263366490652,
+        "file_size": 12400,
+        "iterations": 3
+      },
+      "large": {
+        "avg_time": 0.019059022267659504,
+        "min_time": 0.012323617935180664,
+        "max_time": 0.030208349227905273,
+        "std_dev": 0.00972511892349782,
+        "file_size": 110000,
+        "iterations": 3
+      }
+    },
+    "query_performance": {
+      "total_queries": 8,
+      "successful_queries": 8,
+      "success_rate": 100.0,
+      "avg_time": 0.00031942129135131836,
+      "min_time": 0.00024771690368652344,
+      "max_time": 0.0004341602325439453,
+      "std_dev": 7.37002420105875e-05,
+      "queries_per_second": 3130.6616906139207
+    },
+    "concurrent_queries": {
+      "1": {
+        "total_queries": 1,
+        "successful_queries": 1,
+        "success_rate": 100.0,
+        "total_time": 0.0004432201385498047,
+        "avg_query_time": 0.0003230571746826172,
+        "max_query_time": 0.0003230571746826172,
+        "throughput": 2256.2151694459385
+      },
+      "2": {
+        "total_queries": 2,
+        "successful_queries": 2,
+        "success_rate": 100.0,
+        "total_time": 0.0007796287536621094,
+        "avg_query_time": 0.0003478527069091797,
+        "max_query_time": 0.00034999847412109375,
+        "throughput": 2565.3235474006115
+      },
+      "5": {
+        "total_queries": 5,
+        "successful_queries": 5,
+        "success_rate": 100.0,
+        "total_time": 0.00152587890625,
+        "avg_query_time": 0.00029120445251464846,
+        "max_query_time": 0.0003151893615722656,
+        "throughput": 3276.8
+      },
+      "10": {
+        "total_queries": 10,
+        "successful_queries": 10,
+        "success_rate": 100.0,
+        "total_time": 0.0030715465545654297,
+        "avg_query_time": 0.0002944469451904297,
+        "max_query_time": 0.00034308433532714844,
+        "throughput": 3255.688892338741
+      }
+    },
+    "voice_processing": {
+      "voices_available": 6,
+      "voices_lookup_time": 3.0994415283203125e-06,
+      "tts_tests": 3,
+      "tts_successful": 3,
+      "avg_tts_time": 0.0007784366607666016,
+      "min_tts_time": 0.0006847381591796875,
+      "max_tts_time": 0.00090789794921875
+    }
+  }
+}

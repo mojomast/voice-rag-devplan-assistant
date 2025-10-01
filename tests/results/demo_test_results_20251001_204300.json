@@ -1,0 +1,52 @@
+{
+  "session_id": "demo_test_20251001_204300",
+  "timestamp": "2025-10-01T20:43:00.000000",
+  "total_tests": 5,
+  "passed_tests": 4,
+  "failed_tests": 1,
+  "error_tests": 0,
+  "success_rate": 0.8,
+  "api_key_status": {
+    "openai": false,
+    "requesty": false,
+    "elevenlabs": false,
+    "azure_speech": false,
+    "google_speech": false,
+    "aws_polly": false
+  },
+  "api_test_results": [
+    {
+      "test_name": "test_openai_chat_real",
+      "status": "passed",
+      "duration_seconds": 2.3,
+      "timestamp": "2025-10-01T20:43:01.000000"
+    },
+    {
+      "test_name": "test_openai_embeddings_real",
+      "status": "passed",
+      "duration_seconds": 1.8,
+      "timestamp": "2025-10-01T20:43:03.000000"
+    },
+    {
+      "test_name": "test_voice_tts_real",
+      "status": "failed",
+      "duration_seconds": 3.1,
+      "timestamp": "2025-10-01T20:43:05.000000",
+      "error": "Simulated API failure - invalid response format"
+    },
+    {
+      "test_name": "test_requesty_router_real",
+      "status": "passed",
+      "duration_seconds": 2.7,
+      "timestamp": "2025-10-01T20:43:07.000000"
+    }
+  ],
+  "assisted_test_result": {
+    "scenario_id": "demo_execution",
+    "status": "passed",
+    "duration_seconds": 45.2,
+    "step_count": 3,
+    "passed_steps": 3,
+    "feedback": "The framework worked well and provided clear guidance throughout the testing process."
+  }
+}

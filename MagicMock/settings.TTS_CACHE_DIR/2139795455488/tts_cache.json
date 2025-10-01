@@ -1,0 +1,29 @@
+{
+  "3dc712a3a2150fffbd108e1fc8f801b9": {
+    "text_hash": "3dc712a3a2150fffbd108e1fc8f801b9",
+    "voice": "alloy",
+    "audio_data": "ZGF0YTE=",
+    "mime_type": "audio/mpeg",
+    "created_at": "2025-10-01T15:40:52.035465",
+    "access_count": 1,
+    "last_accessed": "2025-10-01T15:40:52.035466"
+  },
+  "f9ac68e725c36e6b2a23001b7b9c191a": {
+    "text_hash": "f9ac68e725c36e6b2a23001b7b9c191a",
+    "voice": "echo",
+    "audio_data": "ZGF0YTI=",
+    "mime_type": "audio/mpeg",
+    "created_at": "2025-10-01T15:40:52.036150",
+    "access_count": 1,
+    "last_accessed": "2025-10-01T15:40:52.036150"
+  },
+  "61280033e8ce3fc9a3b4fff5595afc69": {
+    "text_hash": "61280033e8ce3fc9a3b4fff5595afc69",
+    "voice": "fable",
+    "audio_data": "ZGF0YTM=",
+    "mime_type": "audio/mpeg",
+    "created_at": "2025-10-01T15:40:52.037336",
+    "access_count": 1,
+    "last_accessed": "2025-10-01T15:40:52.037337"
+  }
+}
